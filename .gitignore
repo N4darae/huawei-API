@@ -56,3 +56,24 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# Go
+/src/dongled
+/src/bin/
+/src/coverage.out
+/src/**/*.test
+*.db
+*.db-wal
+*.db-shm
+
+# Node / Vite
+node_modules/
+/src/web/dist/
+/src/web/.vite/
+/src/web/*.tsbuildinfo
+/src/internal/webui/dist/assets/
+
+# The embedded SPA placeholder is tracked on purpose: //go:embed is compile-time.
+!/src/internal/webui/dist/
+!/src/internal/webui/dist/index.html
+!/src/internal/webui/dist/.gitkeep
