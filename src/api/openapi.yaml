@@ -1,0 +1,1838 @@
+openapi: 3.0.3
+info:
+  title: dongled
+  version: 1.0.0
+  description: >-
+    Operations panel and customer API for a farm of Huawei E3372 HiLink dongles sold as
+    SOCKS5/HTTP proxies. Customer-facing identifiers are always proxy_id, never dongle_id.
+servers:
+  - url: /
+tags:
+  - name: auth
+  - name: proxies
+  - name: dongles
+  - name: operations
+  - name: customers
+  - name: keys
+  - name: enroll
+  - name: events
+  - name: customer-api
+
+paths:
+  /api/v1/healthz:
+    get:
+      tags: [events]
+      operationId: healthz
+      summary: Liveness plus routing and firewall invariants
+      responses:
+        "200":
+          description: healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: an invariant is violated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "204":
+          description: session cookie issued
+        "401":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      responses:
+        "204":
+          description: session revoked
+
+  /api/v1/auth/session:
+    get:
+      tags: [auth]
+      operationId: session
+      responses:
+        "200":
+          description: current session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/proxies:
+    get:
+      tags: [proxies]
+      operationId: listProxies
+      parameters:
+        - name: customer_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ProxyState"
+        - name: expiring_within_days
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: proxy list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProxyList"
+
+  /api/v1/proxies/export:
+    get:
+      tags: [proxies]
+      operationId: exportProxies
+      parameters:
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [txt, csv]
+        - name: scheme
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [socks5, http]
+        - name: ids
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: one proxy per line as host:port:user:pass
+          content:
+            text/plain:
+              schema:
+                type: string
+            text/csv:
+              schema:
+                type: string
+
+  /api/v1/proxies/{proxy_id}:
+    get:
+      tags: [proxies]
+      operationId: getProxy
+      parameters:
+        - $ref: "#/components/parameters/ProxyID"
+      responses:
+        "200":
+          description: proxy detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProxyDetail"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/proxies/{proxy_id}/rotate:
+    post:
+      tags: [proxies]
+      operationId: rotateProxyAdmin
+      parameters:
+        - $ref: "#/components/parameters/ProxyID"
+      responses:
+        "202":
+          description: rotation accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationAccepted"
+        "409":
+          $ref: "#/components/responses/OpInProgress"
+        "429":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/proxies/{proxy_id}/auth:
+    post:
+      tags: [proxies]
+      operationId: setProxyAuth
+      parameters:
+        - $ref: "#/components/parameters/ProxyID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetAuthRequest"
+      responses:
+        "202":
+          description: auth change accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationAccepted"
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/OpInProgress"
+
+  /api/v1/proxies/{proxy_id}/auth-ips:
+    get:
+      tags: [proxies]
+      operationId: listProxyAuthIPs
+      parameters:
+        - $ref: "#/components/parameters/ProxyID"
+      responses:
+        "200":
+          description: whitelisted source networks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthIPList"
+    post:
+      tags: [proxies]
+      operationId: addProxyAuthIP
+      parameters:
+        - $ref: "#/components/parameters/ProxyID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthIPRequest"
+      responses:
+        "200":
+          description: updated whitelist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthIPList"
+        "400":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [proxies]
+      operationId: deleteProxyAuthIP
+      parameters:
+        - $ref: "#/components/parameters/ProxyID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthIPRequest"
+      responses:
+        "200":
+          description: updated whitelist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthIPList"
+        "400":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/proxies/{proxy_id}/ports:
+    post:
+      tags: [proxies]
+      operationId: setProxyPorts
+      parameters:
+        - $ref: "#/components/parameters/ProxyID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProxyPolicy"
+      responses:
+        "202":
+          description: port policy accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationAccepted"
+        "400":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/proxies/{proxy_id}/enable:
+    post:
+      tags: [proxies]
+      operationId: setProxyEnabled
+      parameters:
+        - $ref: "#/components/parameters/ProxyID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnableRequest"
+      responses:
+        "200":
+          description: proxy patched
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proxy"
+
+  /api/v1/proxies/{proxy_id}/customer:
+    post:
+      tags: [proxies]
+      operationId: assignProxyCustomer
+      parameters:
+        - $ref: "#/components/parameters/ProxyID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignCustomerRequest"
+      responses:
+        "200":
+          description: proxy patched
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proxy"
+
+  /api/v1/proxies/{proxy_id}/selftest:
+    post:
+      tags: [proxies]
+      operationId: selftestProxy
+      parameters:
+        - $ref: "#/components/parameters/ProxyID"
+      responses:
+        "200":
+          description: selftest result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SelftestResult"
+
+  /api/v1/slots:
+    get:
+      tags: [dongles]
+      operationId: listSlots
+      responses:
+        "200":
+          description: slot list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlotList"
+
+  /api/v1/dongles:
+    get:
+      tags: [dongles]
+      operationId: listDongles
+      responses:
+        "200":
+          description: dongle list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DongleList"
+
+  /api/v1/dongles/{dongle_id}:
+    get:
+      tags: [dongles]
+      operationId: getDongle
+      parameters:
+        - $ref: "#/components/parameters/DongleID"
+      responses:
+        "200":
+          description: dongle detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DongleDetail"
+        "404":
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [dongles]
+      operationId: patchDongle
+      parameters:
+        - $ref: "#/components/parameters/DongleID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DonglePatchRequest"
+      responses:
+        "200":
+          description: dongle patched
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dongle"
+
+  /api/v1/dongles/{dongle_id}/reboot:
+    post:
+      tags: [dongles]
+      operationId: rebootDongle
+      parameters:
+        - $ref: "#/components/parameters/DongleID"
+      responses:
+        "202":
+          description: reboot accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationAccepted"
+        "409":
+          $ref: "#/components/responses/OpInProgress"
+
+  /api/v1/dongles/{dongle_id}/netmode:
+    post:
+      tags: [dongles]
+      operationId: setDongleNetMode
+      parameters:
+        - $ref: "#/components/parameters/DongleID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NetModeRequest"
+      responses:
+        "202":
+          description: net mode change accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationAccepted"
+        "409":
+          $ref: "#/components/responses/OpInProgress"
+
+  /api/v1/dongles/{dongle_id}/lanip:
+    post:
+      tags: [dongles]
+      operationId: setDongleLanIP
+      parameters:
+        - $ref: "#/components/parameters/DongleID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LanIPRequest"
+      responses:
+        "202":
+          description: lan ip change accepted, expect a re_discovering step
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationAccepted"
+        "409":
+          $ref: "#/components/responses/OpInProgress"
+
+  /api/v1/dongles/{dongle_id}/sms:
+    get:
+      tags: [dongles]
+      operationId: listSms
+      parameters:
+        - $ref: "#/components/parameters/DongleID"
+        - name: box
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/SmsBox"
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: sms page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmsList"
+
+  /api/v1/dongles/{dongle_id}/sms/send:
+    post:
+      tags: [dongles]
+      operationId: sendSms
+      parameters:
+        - $ref: "#/components/parameters/DongleID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmsSendRequest"
+      responses:
+        "204":
+          description: queued on the modem
+
+  /api/v1/dongles/{dongle_id}/sms/delete:
+    post:
+      tags: [dongles]
+      operationId: deleteSms
+      parameters:
+        - $ref: "#/components/parameters/DongleID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmsIndexRequest"
+      responses:
+        "204":
+          description: deleted
+
+  /api/v1/dongles/{dongle_id}/sms/read:
+    post:
+      tags: [dongles]
+      operationId: markSmsRead
+      parameters:
+        - $ref: "#/components/parameters/DongleID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmsIndexRequest"
+      responses:
+        "204":
+          description: marked read
+
+  /api/v1/operations:
+    get:
+      tags: [operations]
+      operationId: listOperations
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/OpKind"
+        - name: trigger
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/Trigger"
+        - name: state
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/OpState"
+        - name: subject_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: operation list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationList"
+
+  /api/v1/operations/{op_id}:
+    get:
+      tags: [operations]
+      operationId: getOperation
+      parameters:
+        - name: op_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/rotations:
+    get:
+      tags: [operations]
+      operationId: listRotations
+      parameters:
+        - name: proxy_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: redacted rotation history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RotationList"
+
+  /api/v1/customers:
+    get:
+      tags: [customers]
+      operationId: listCustomers
+      responses:
+        "200":
+          description: customer list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerList"
+    post:
+      tags: [customers]
+      operationId: createCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerRequest"
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+  /api/v1/customers/{customer_id}:
+    patch:
+      tags: [customers]
+      operationId: patchCustomer
+      parameters:
+        - name: customer_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerRequest"
+      responses:
+        "200":
+          description: patched
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+  /api/v1/keys:
+    get:
+      tags: [keys]
+      operationId: listApiKeys
+      responses:
+        "200":
+          description: api key list, hashes never returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyList"
+    post:
+      tags: [keys]
+      operationId: createApiKey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiKeyRequest"
+      responses:
+        "201":
+          description: created, secret shown exactly once
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyCreated"
+
+  /api/v1/keys/{key_id}:
+    delete:
+      tags: [keys]
+      operationId: revokeApiKey
+      parameters:
+        - name: key_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: revoked
+
+  /api/v1/keys/{key_id}/link-tokens:
+    post:
+      tags: [keys]
+      operationId: createLinkToken
+      parameters:
+        - name: key_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: created, url shown exactly once
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LinkTokenCreated"
+
+  /api/v1/link-tokens/{token_id}:
+    delete:
+      tags: [keys]
+      operationId: revokeLinkToken
+      parameters:
+        - name: token_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: revoked independently of the api key
+
+  /api/v1/enroll/begin:
+    post:
+      tags: [enroll]
+      operationId: enrollBegin
+      responses:
+        "201":
+          description: enrollment session opened
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollSession"
+        "409":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/enroll/confirm:
+    post:
+      tags: [enroll]
+      operationId: enrollConfirm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollConfirmRequest"
+      responses:
+        "202":
+          description: enrollment accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationAccepted"
+        "400":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/enroll/abort:
+    post:
+      tags: [enroll]
+      operationId: enrollAbort
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollAbortRequest"
+      responses:
+        "204":
+          description: aborted
+
+  /api/v1/events:
+    get:
+      tags: [events]
+      operationId: events
+      description: >-
+        Server-sent events. No replay: the stream opens with a hello event and the client
+        refetches its queries on every reconnect. nginx must disable proxy buffering.
+      parameters:
+        - name: topics
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /api/v1/rotate/{proxy_id}:
+    post:
+      tags: [customer-api]
+      operationId: rotateProxyCustomer
+      description: >-
+        Asynchronous by default: 202 with an operation id and a poll url. wait=true blocks
+        for at most 90s and returns the terminal result. A rotation that completes without
+        changing the public IP is result unchanged with ip_changed false.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProxyID"
+        - name: wait
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: terminal result when wait=true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RotateResult"
+        "202":
+          description: accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationAccepted"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/OpInProgress"
+        "429":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/status/{proxy_id}:
+    get:
+      tags: [customer-api]
+      operationId: customerStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProxyID"
+      responses:
+        "200":
+          description: customer visible status, never exposes dongle_id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerStatus"
+        "401":
+          $ref: "#/components/responses/Error"
+
+  /r/{link_token}:
+    get:
+      tags: [customer-api]
+      operationId: linkConfirmPage
+      description: >-
+        Renders a confirmation page. GET has no side effect because link scanners and
+        prefetchers do not send any identifying header.
+      parameters:
+        - $ref: "#/components/parameters/LinkToken"
+      responses:
+        "200":
+          description: confirmation page
+          content:
+            text/html:
+              schema:
+                type: string
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [customer-api]
+      operationId: linkRotate
+      parameters:
+        - $ref: "#/components/parameters/LinkToken"
+      responses:
+        "200":
+          description: terminal result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RotateResult"
+        "202":
+          description: accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationAccepted"
+        "409":
+          $ref: "#/components/responses/OpInProgress"
+        "429":
+          $ref: "#/components/responses/Error"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-dongled_session
+
+  parameters:
+    ProxyID:
+      name: proxy_id
+      in: path
+      required: true
+      schema:
+        type: string
+    DongleID:
+      name: dongle_id
+      in: path
+      required: true
+      schema:
+        type: string
+    LinkToken:
+      name: link_token
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    Error:
+      description: error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    OpInProgress:
+      description: another operation already runs on this subject
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/OpInProgress"
+
+  schemas:
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        request_id:
+          type: string
+        retry_after:
+          type: integer
+
+    OpInProgress:
+      type: object
+      required: [error, operation_id]
+      properties:
+        error:
+          type: string
+          enum: [op_in_progress]
+        operation_id:
+          type: string
+        poll_url:
+          type: string
+
+    Health:
+      type: object
+      required: [status, product, node_id, invariants]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        product:
+          type: string
+        node_id:
+          type: string
+        version:
+          type: string
+        invariants:
+          type: array
+          items:
+            $ref: "#/components/schemas/Invariant"
+
+    Invariant:
+      type: object
+      required: [name, ok]
+      properties:
+        name:
+          type: string
+        ok:
+          type: boolean
+        detail:
+          type: string
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    Session:
+      type: object
+      required: [username, expires_at]
+      properties:
+        username:
+          type: string
+        expires_at:
+          type: integer
+        csrf_token:
+          type: string
+
+    PortRange:
+      type: object
+      required: [lo, hi]
+      properties:
+        lo:
+          type: integer
+        hi:
+          type: integer
+
+    ProxyPolicy:
+      type: object
+      required: [allow_all_ports, max_conn, conn_limit]
+      properties:
+        allow_all_ports:
+          type: boolean
+        allowed_ports:
+          type: array
+          items:
+            $ref: "#/components/schemas/PortRange"
+        max_conn:
+          type: integer
+        conn_limit:
+          type: integer
+
+    AuthMode:
+      type: string
+      enum: [userpass, iplist, both]
+
+    ProxyState:
+      type: string
+      enum: [active, suspended, disabled, expired, degraded, unknown]
+
+    OpKind:
+      type: string
+      enum: [rotate, reboot, set_auth, set_ports, set_lan_ip, set_net_mode, enroll, selftest]
+
+    OpState:
+      type: string
+      enum: [pending, running, stalled, succeeded, failed, canceled]
+
+    Trigger:
+      type: string
+      enum: [admin_ui, customer_api, auto_recovery]
+
+    RotationResult:
+      type: string
+      enum: [changed, unchanged, failed]
+
+    NetMode:
+      type: string
+      enum: [auto, 2g, 3g, lte]
+
+    SmsBox:
+      type: integer
+      enum: [1, 2, 3]
+
+    ConnStatus:
+      type: integer
+      enum: [900, 901, 902, 903]
+
+    AuthIP:
+      type: object
+      required: [id, cidr, created_at]
+      properties:
+        id:
+          type: string
+        cidr:
+          type: string
+        note:
+          type: string
+        created_at:
+          type: integer
+
+    AuthIPList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuthIP"
+
+    AuthIPRequest:
+      type: object
+      required: [cidr]
+      properties:
+        cidr:
+          type: string
+        note:
+          type: string
+
+    Proxy:
+      type: object
+      required:
+        [id, slot, state, host, socks_port, http_port, username, auth_mode, ports_bound, policy]
+      properties:
+        id:
+          type: string
+        slot:
+          type: integer
+        state:
+          $ref: "#/components/schemas/ProxyState"
+        host:
+          type: string
+        socks_port:
+          type: integer
+        http_port:
+          type: integer
+        username:
+          type: string
+        password:
+          type: string
+        auth_mode:
+          $ref: "#/components/schemas/AuthMode"
+        auth_ip_count:
+          type: integer
+        enabled:
+          type: boolean
+        suspended:
+          type: boolean
+        customer_id:
+          type: string
+          nullable: true
+        customer_name:
+          type: string
+        expires_at:
+          type: integer
+          nullable: true
+        wan_ip:
+          type: string
+        signal_bars:
+          type: integer
+        data_used_bytes:
+          type: integer
+        data_cap_bytes:
+          type: integer
+        ports_bound:
+          $ref: "#/components/schemas/PortsBound"
+        policy:
+          $ref: "#/components/schemas/ProxyPolicy"
+        active_operation_id:
+          type: string
+          nullable: true
+        updated_at:
+          type: integer
+
+    PortsBound:
+      type: object
+      required: [socks, http]
+      properties:
+        socks:
+          type: boolean
+        http:
+          type: boolean
+        probe_ok:
+          type: boolean
+
+    ProxyList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Proxy"
+        total:
+          type: integer
+
+    ProxyDetail:
+      type: object
+      required: [proxy]
+      properties:
+        proxy:
+          $ref: "#/components/schemas/Proxy"
+        auth_ips:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuthIP"
+        slot:
+          $ref: "#/components/schemas/Slot"
+        last_rotation:
+          $ref: "#/components/schemas/Rotation"
+
+    SetAuthRequest:
+      type: object
+      required: [auth_mode]
+      properties:
+        auth_mode:
+          $ref: "#/components/schemas/AuthMode"
+        username:
+          type: string
+        password:
+          type: string
+        rotate_password:
+          type: boolean
+
+    EnableRequest:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+
+    AssignCustomerRequest:
+      type: object
+      properties:
+        customer_id:
+          type: string
+          nullable: true
+        expires_at:
+          type: integer
+          nullable: true
+
+    SelftestResult:
+      type: object
+      required: [socks_ok, http_ok]
+      properties:
+        socks_ok:
+          type: boolean
+        http_ok:
+          type: boolean
+        egress_ip:
+          type: string
+        latency_ms:
+          type: integer
+        error:
+          type: string
+
+    Slot:
+      type: object
+      required: [id, slot, if_name, usb_path, occupied]
+      properties:
+        id:
+          type: string
+        slot:
+          type: integer
+        if_name:
+          type: string
+        usb_path:
+          type: string
+        id_path:
+          type: string
+        occupied:
+          type: boolean
+        dongle_id:
+          type: string
+          nullable: true
+        host_ip:
+          type: string
+        gateway_ip:
+          type: string
+        route_table:
+          type: integer
+
+    SlotList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Slot"
+
+    Dongle:
+      type: object
+      required: [id, imei, slot, conn_status]
+      properties:
+        id:
+          type: string
+        imei:
+          type: string
+        iccid:
+          type: string
+        imsi:
+          type: string
+        firmware_ver:
+          type: string
+        hw_ver:
+          type: string
+        carrier:
+          type: string
+        slot:
+          type: integer
+        conn_status:
+          $ref: "#/components/schemas/ConnStatus"
+        sim_state:
+          type: integer
+        net_mode:
+          $ref: "#/components/schemas/NetMode"
+        wan_ip:
+          type: string
+        lan_ip_change_supported:
+          type: boolean
+        hilink_login_required:
+          type: boolean
+        auto_recover_enabled:
+          type: boolean
+        data_cap_bytes:
+          type: integer
+        cap_reset_day:
+          type: integer
+        reachable:
+          type: boolean
+        observed_at:
+          type: integer
+
+    DongleList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Dongle"
+
+    DongleDetail:
+      type: object
+      required: [dongle]
+      properties:
+        dongle:
+          $ref: "#/components/schemas/Dongle"
+        signal:
+          $ref: "#/components/schemas/Signal"
+        traffic:
+          $ref: "#/components/schemas/Traffic"
+        slot:
+          $ref: "#/components/schemas/Slot"
+        unread_sms:
+          type: integer
+
+    DonglePatchRequest:
+      type: object
+      properties:
+        auto_recover_enabled:
+          type: boolean
+        data_cap_bytes:
+          type: integer
+        cap_reset_day:
+          type: integer
+        carrier:
+          type: string
+
+    Signal:
+      type: object
+      properties:
+        rssi:
+          type: integer
+        rsrp:
+          type: integer
+        rsrq:
+          type: integer
+        sinr:
+          type: integer
+        bars:
+          type: integer
+        band:
+          type: string
+        cell_id:
+          type: string
+        plmn:
+          type: string
+        mode:
+          type: string
+
+    Traffic:
+      type: object
+      properties:
+        current_upload:
+          type: integer
+        current_download:
+          type: integer
+        current_upload_rate:
+          type: integer
+        current_download_rate:
+          type: integer
+        total_upload:
+          type: integer
+        total_download:
+          type: integer
+        current_connect_time:
+          type: integer
+        month_upload:
+          type: integer
+        month_download:
+          type: integer
+
+    NetModeRequest:
+      type: object
+      required: [net_mode]
+      properties:
+        net_mode:
+          $ref: "#/components/schemas/NetMode"
+
+    LanIPRequest:
+      type: object
+      required: [gateway]
+      properties:
+        gateway:
+          type: string
+
+    Sms:
+      type: object
+      required: [index, phone, content, sent_at, box, read, is_fragment]
+      properties:
+        index:
+          type: integer
+        phone:
+          type: string
+        content:
+          type: string
+        sent_at:
+          type: integer
+        box:
+          $ref: "#/components/schemas/SmsBox"
+        read:
+          type: boolean
+        sms_type:
+          type: integer
+        is_fragment:
+          type: boolean
+
+    SmsList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Sms"
+        total:
+          type: integer
+
+    SmsSendRequest:
+      type: object
+      required: [to, body]
+      properties:
+        to:
+          type: array
+          items:
+            type: string
+        body:
+          type: string
+
+    SmsIndexRequest:
+      type: object
+      required: [index]
+      properties:
+        index:
+          type: integer
+
+    Operation:
+      type: object
+      required:
+        [id, kind, subject_type, subject_id, state, step, pct, started_at, deadline_at, trigger]
+      properties:
+        id:
+          type: string
+        kind:
+          $ref: "#/components/schemas/OpKind"
+        subject_type:
+          type: string
+          enum: [proxy, dongle, slot, node]
+        subject_id:
+          type: string
+        state:
+          $ref: "#/components/schemas/OpState"
+        step:
+          type: string
+        pct:
+          type: integer
+        started_at:
+          type: integer
+        deadline_at:
+          type: integer
+        finished_at:
+          type: integer
+          nullable: true
+        error:
+          type: string
+        result:
+          type: object
+          additionalProperties: true
+        trigger:
+          $ref: "#/components/schemas/Trigger"
+        actor_type:
+          type: string
+        request_id:
+          type: string
+
+    OperationList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Operation"
+
+    OperationAccepted:
+      type: object
+      required: [operation_id, poll_url]
+      properties:
+        operation_id:
+          type: string
+        poll_url:
+          type: string
+        state:
+          $ref: "#/components/schemas/OpState"
+        deadline_at:
+          type: integer
+
+    Rotation:
+      type: object
+      required: [id, requested_at, duration_ms, ip_changed, result]
+      properties:
+        id:
+          type: string
+        requested_at:
+          type: integer
+        duration_ms:
+          type: integer
+        old_public_ip:
+          type: string
+        new_public_ip:
+          type: string
+        ip_changed:
+          type: boolean
+        result:
+          $ref: "#/components/schemas/RotationResult"
+        request_id:
+          type: string
+
+    RotationList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Rotation"
+
+    RotateResult:
+      type: object
+      required: [operation_id, result, ip_changed]
+      properties:
+        operation_id:
+          type: string
+        result:
+          $ref: "#/components/schemas/RotationResult"
+        ip_changed:
+          type: boolean
+        old_ip:
+          type: string
+        new_ip:
+          type: string
+        duration_ms:
+          type: integer
+        error:
+          type: string
+
+    CustomerStatus:
+      type: object
+      required: [proxy_id, state, host, socks_port, http_port]
+      properties:
+        proxy_id:
+          type: string
+        state:
+          $ref: "#/components/schemas/ProxyState"
+        host:
+          type: string
+        socks_port:
+          type: integer
+        http_port:
+          type: integer
+        wan_ip:
+          type: string
+        expires_at:
+          type: integer
+          nullable: true
+        last_rotated_at:
+          type: integer
+        min_rotate_interval_s:
+          type: integer
+        rotate_available_at:
+          type: integer
+
+    Customer:
+      type: object
+      required: [id, name, created_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        contact:
+          type: string
+        note:
+          type: string
+        proxy_count:
+          type: integer
+        created_at:
+          type: integer
+
+    CustomerList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Customer"
+
+    CustomerRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        contact:
+          type: string
+        note:
+          type: string
+
+    ApiKey:
+      type: object
+      required: [id, name, prefix, scopes, created_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        prefix:
+          type: string
+        customer_id:
+          type: string
+          nullable: true
+        scopes:
+          type: array
+          items:
+            type: string
+        proxy_ids:
+          type: array
+          items:
+            type: string
+        last_used_at:
+          type: integer
+          nullable: true
+        revoked_at:
+          type: integer
+          nullable: true
+        created_at:
+          type: integer
+        link_tokens:
+          type: array
+          items:
+            $ref: "#/components/schemas/LinkToken"
+
+    ApiKeyList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiKey"
+
+    ApiKeyRequest:
+      type: object
+      required: [name, scopes]
+      properties:
+        name:
+          type: string
+        customer_id:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        proxy_ids:
+          type: array
+          items:
+            type: string
+
+    ApiKeyCreated:
+      type: object
+      required: [key, secret]
+      properties:
+        key:
+          $ref: "#/components/schemas/ApiKey"
+        secret:
+          type: string
+
+    LinkToken:
+      type: object
+      required: [id, api_key_id, created_at]
+      properties:
+        id:
+          type: string
+        api_key_id:
+          type: string
+        revoked_at:
+          type: integer
+          nullable: true
+        created_at:
+          type: integer
+
+    LinkTokenCreated:
+      type: object
+      required: [token, url]
+      properties:
+        token:
+          $ref: "#/components/schemas/LinkToken"
+        url:
+          type: string
+
+    EnrollSession:
+      type: object
+      required: [session_id, state]
+      properties:
+        session_id:
+          type: string
+        state:
+          type: string
+        step:
+          type: string
+        candidate:
+          $ref: "#/components/schemas/EnrollCandidate"
+        suggested_slot:
+          type: integer
+
+    EnrollCandidate:
+      type: object
+      properties:
+        imei:
+          type: string
+        iccid:
+          type: string
+        imsi:
+          type: string
+        firmware_ver:
+          type: string
+        if_name:
+          type: string
+        id_path:
+          type: string
+        usb_path:
+          type: string
+        mgmt_ip:
+          type: string
+        sim_state:
+          type: integer
+        hilink_login_required:
+          type: boolean
+
+    EnrollConfirmRequest:
+      type: object
+      required: [session_id, slot]
+      properties:
+        session_id:
+          type: string
+        slot:
+          type: integer
+
+    EnrollAbortRequest:
+      type: object
+      required: [session_id]
+      properties:
+        session_id:
+          type: string
+
+    HelloEvent:
+      type: object
+      required: [node_id, server_time, topics, product]
+      properties:
+        node_id:
+          type: string
+        server_time:
+          type: integer
+        topics:
+          type: array
+          items:
+            type: string
+        product:
+          type: string
+
+    PatchEvent:
+      type: object
+      required: [id, fields]
+      properties:
+        id:
+          type: string
+        fields:
+          type: object
+          additionalProperties: true
+
+    SmsEvent:
+      type: object
+      required: [dongle_id, index]
+      properties:
+        dongle_id:
+          type: string
+        index:
+          type: integer
+        phone:
+          type: string
+        preview:
+          type: string
+        is_fragment:
+          type: boolean
+        sent_at:
+          type: integer
+
+    NoticeEvent:
+      type: object
+      required: [level, title]
+      properties:
+        level:
+          type: string
+          enum: [info, warn, error]
+        title:
+          type: string
+        detail:
+          type: string
