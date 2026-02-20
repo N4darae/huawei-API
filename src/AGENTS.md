@@ -145,6 +145,11 @@ Regenerate with `make gen`. `make check` fails if the committed output is stale.
 - **Default port policy is open** with `25/465/587` dropped at the nft layer, not in the 3proxy ACL.
 - **Trigger enum has three members**: `admin_ui`, `customer_api`, `auto_recovery`. There is no
   `'schedule'`; scheduled auto-rotation is out of scope and must not be built.
+- **Enrollment is a CLI**, `dongled enroll --slot N`. There is no `POST /api/v1/enroll/*`, no
+  `EnrollSession` resource and no wizard UI; the ten-step sequence itself is unchanged and still writes
+  an `operations` row with `kind = "enroll"`.
+- **URL tree**: everything lives under `/api/v1/**`, admin included. The only exception is
+  `/r/{link_token}`. A customer-facing response never contains `dongle_id`.
 - **Cut from the model and the schema**: `FwMark`, `drain_timeout_ms`, `netns_fallback`,
   `totp_secret_enc`, `agent_url`, `agent_token_hash`, `proxy_assignments`, `usage_proxy_daily`,
   `carrier_profiles`, SSE `id`/`seq` replay fields.
