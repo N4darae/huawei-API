@@ -403,3 +403,11 @@ its own.**
 | A4 | `cat /sys/class/net/dgNN/{carrier,operstate}` immediately after enumeration and after 60s | `ConfigureWithoutCarrier`, the definition of "present", the rotate `PreCheck` |
 | A-login | Is the real SKU a -320 or a -325? What does `GET /api/user/hilink_login` return? | P1 error handling, and whether enrollment may refuse |
 | A6 | Farm host: static IP, kernel ≥ 6.2, USB hub with PPPS, 1A per port | `internal <ip>`, D-18, `docs/HARDWARE.md` |
+
+### D-66 Enrollment is a CLI, not a server-side wizard [U]
+`dongled enroll --slot N` performs the frozen ten-step sequence, including the "exactly one
+unprovisioned dongle" lock, disabling the USB port of every other unprovisioned slot for the duration,
+the duplicate-address watchdog, and `MaxIdelTime=0`. `POST /api/v1/enroll/{begin,confirm,abort}`, the
+`EnrollSession` resource and the wizard UI are **not** in the API surface — they were cut with the
+wizard. The enrollment run still writes an `operations` row with `kind = "enroll"`, so it appears in
+activity history and on the event stream.

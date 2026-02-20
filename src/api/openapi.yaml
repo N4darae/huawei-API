@@ -14,7 +14,6 @@ tags:
   - name: operations
   - name: customers
   - name: keys
-  - name: enroll
   - name: events
   - name: customer-api
 
@@ -728,54 +727,6 @@ paths:
       responses:
         "204":
           description: revoked independently of the api key
-
-  /api/v1/enroll/begin:
-    post:
-      tags: [enroll]
-      operationId: enrollBegin
-      responses:
-        "201":
-          description: enrollment session opened
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EnrollSession"
-        "409":
-          $ref: "#/components/responses/Error"
-
-  /api/v1/enroll/confirm:
-    post:
-      tags: [enroll]
-      operationId: enrollConfirm
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/EnrollConfirmRequest"
-      responses:
-        "202":
-          description: enrollment accepted
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/OperationAccepted"
-        "400":
-          $ref: "#/components/responses/Error"
-
-  /api/v1/enroll/abort:
-    post:
-      tags: [enroll]
-      operationId: enrollAbort
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/EnrollAbortRequest"
-      responses:
-        "204":
-          description: aborted
 
   /api/v1/events:
     get:
@@ -1726,61 +1677,6 @@ components:
         token:
           $ref: "#/components/schemas/LinkToken"
         url:
-          type: string
-
-    EnrollSession:
-      type: object
-      required: [session_id, state]
-      properties:
-        session_id:
-          type: string
-        state:
-          type: string
-        step:
-          type: string
-        candidate:
-          $ref: "#/components/schemas/EnrollCandidate"
-        suggested_slot:
-          type: integer
-
-    EnrollCandidate:
-      type: object
-      properties:
-        imei:
-          type: string
-        iccid:
-          type: string
-        imsi:
-          type: string
-        firmware_ver:
-          type: string
-        if_name:
-          type: string
-        id_path:
-          type: string
-        usb_path:
-          type: string
-        mgmt_ip:
-          type: string
-        sim_state:
-          type: integer
-        hilink_login_required:
-          type: boolean
-
-    EnrollConfirmRequest:
-      type: object
-      required: [session_id, slot]
-      properties:
-        session_id:
-          type: string
-        slot:
-          type: integer
-
-    EnrollAbortRequest:
-      type: object
-      required: [session_id]
-      properties:
-        session_id:
           type: string
 
     HelloEvent:

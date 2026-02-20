@@ -25,7 +25,6 @@ export type Customer = components['schemas']['Customer']
 export type ApiKey = components['schemas']['ApiKey']
 export type LinkToken = components['schemas']['LinkToken']
 export type SelftestResult = components['schemas']['SelftestResult']
-export type EnrollSession = components['schemas']['EnrollSession']
 export type Health = components['schemas']['Health']
 export type ApiError = components['schemas']['Error']
 export type OpInProgress = components['schemas']['OpInProgress']
@@ -69,7 +68,6 @@ export const qk = {
 
   customers: () => ['customers'] as const,
   keys: () => ['keys'] as const,
-  enroll: (sessionId: string) => ['enroll', sessionId] as const,
 } as const
 
 export const TOPIC_QUERY_KEYS: Record<Topic, readonly unknown[][]> = {

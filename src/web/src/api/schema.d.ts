@@ -103,15 +103,6 @@ export interface paths {
   "/api/v1/link-tokens/{token_id}": {
     delete: operations["revokeLinkToken"];
   };
-  "/api/v1/enroll/begin": {
-    post: operations["enrollBegin"];
-  };
-  "/api/v1/enroll/confirm": {
-    post: operations["enrollConfirm"];
-  };
-  "/api/v1/enroll/abort": {
-    post: operations["enrollAbort"];
-  };
   "/api/v1/events": {
     get: operations["events"];
   };
@@ -467,32 +458,6 @@ export interface components {
       "token": components["schemas"]["LinkToken"];
       "url": string;
     };
-    EnrollSession: {
-      "session_id": string;
-      "state": string;
-      "step"?: string;
-      "candidate"?: components["schemas"]["EnrollCandidate"];
-      "suggested_slot"?: number;
-    };
-    EnrollCandidate: {
-      "imei"?: string;
-      "iccid"?: string;
-      "imsi"?: string;
-      "firmware_ver"?: string;
-      "if_name"?: string;
-      "id_path"?: string;
-      "usb_path"?: string;
-      "mgmt_ip"?: string;
-      "sim_state"?: number;
-      "hilink_login_required"?: boolean;
-    };
-    EnrollConfirmRequest: {
-      "session_id": string;
-      "slot": number;
-    };
-    EnrollAbortRequest: {
-      "session_id": string;
-    };
     HelloEvent: {
       "node_id": string;
       "server_time": number;
@@ -668,55 +633,6 @@ export interface operations {
     responses: {
       204: {
         content?: never;
-      };
-    };
-  };
-  enrollAbort: {
-    parameters?: never;
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["EnrollAbortRequest"];
-      };
-    };
-    responses: {
-      204: {
-        content?: never;
-      };
-    };
-  };
-  enrollBegin: {
-    parameters?: never;
-    requestBody?: never;
-    responses: {
-      201: {
-        content: {
-          "application/json": components["schemas"]["EnrollSession"];
-        };
-      };
-      409: {
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
-  enrollConfirm: {
-    parameters?: never;
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["EnrollConfirmRequest"];
-      };
-    };
-    responses: {
-      202: {
-        content: {
-          "application/json": components["schemas"]["OperationAccepted"];
-        };
-      };
-      400: {
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
       };
     };
   };
