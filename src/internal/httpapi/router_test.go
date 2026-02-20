@@ -58,3 +58,26 @@ func TestUnknownPathFallsBackToSPA(t *testing.T) {
 		t.Fatalf("spa fallback content type = %q", ct)
 	}
 }
+
+func TestUnknownAPIPathIsJSON404NotTheSPA(t *testing.T) {
+	h := NewRouter(nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, APIBase+"/proxies", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("unmounted api route = %d, want 404; serving the SPA here hides a typo behind a 200", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/json; charset=utf-8" {
+		t.Fatalf("unmounted api route content type = %q, want json", ct)
+	}
+}
+
+func TestWrongMethodOnAPIIsJSON405(t *testing.T) {
+	h := NewRouter(nil, MounterFunc(func(r chi.Router) {
+		r.Post(APIBase+"/things", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	}))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, APIBase+"/things", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("wrong method = %d, want 405", rec.Code)
+	}
+}

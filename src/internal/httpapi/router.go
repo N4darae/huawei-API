@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -43,8 +44,22 @@ func NewRouter(health HealthFunc, mods ...Mounter) http.Handler {
 		m.Mount(r)
 	}
 
-	r.NotFound(webui.Handler().ServeHTTP)
+	ui := webui.Handler()
+	r.NotFound(func(w http.ResponseWriter, req *http.Request) {
+		if isAPIPath(req.URL.Path) {
+			WriteJSON(w, http.StatusNotFound, map[string]string{"error": "not_found", "message": "unknown endpoint"})
+			return
+		}
+		ui.ServeHTTP(w, req)
+	})
+	r.MethodNotAllowed(func(w http.ResponseWriter, req *http.Request) {
+		WriteJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method_not_allowed", "message": req.Method + " is not allowed here"})
+	})
 	return r
+}
+
+func isAPIPath(p string) bool {
+	return strings.HasPrefix(p, APIBase+"/") || p == APIBase
 }
 
 func healthHandler(health HealthFunc) http.HandlerFunc {
@@ -60,7 +75,7 @@ func healthHandler(health HealthFunc) http.HandlerFunc {
 
 func noStoreAPI(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if len(r.URL.Path) >= len(APIBase) && r.URL.Path[:len(APIBase)] == APIBase {
+		if isAPIPath(r.URL.Path) {
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 		}
