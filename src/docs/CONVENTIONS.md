@@ -1,4 +1,4 @@
-# AGENTS.md — rules every agent working in `src/` must follow
+# CONVENTIONS.md — rules every agent working in `src/` must follow
 
 `dongled` operates a farm of Huawei E3372 HiLink dongles as sellable SOCKS5/HTTP proxies.
 This file is the operating manual for coding agents. Read it fully before writing a line.
@@ -78,7 +78,7 @@ there.
 a contract-change ticket handled by the P0 owner, not an edit in your branch.
 
 ```
-go.mod  go.sum  Makefile  AGENTS.md
+go.mod  go.sum  Makefile  CONVENTIONS.md
 internal/config/**                      paths.go ports.go config.go
 internal/domain/**                      slot.go model.go errors.go enums.go
 internal/store/migrations/0001_init.sql
