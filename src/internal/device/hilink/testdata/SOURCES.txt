@@ -280,3 +280,15 @@ TOKEN HANDSHAKE
         __RequestVerificationTokentwo, or via a plain __RequestVerificationToken.
 
     Both header shapes are implemented in session.go and both are served by internal/device/sim.
+
+ADDENDUM
+--------
+
+user_hilink_login.xml
+    NO third-party capture of this response body exists in any corpus that was searched.
+    The endpoint itself is attested by Salamek/huawei-lte-api huawei_lte_api/api/User.py
+    hilink_login() -> GET user/hilink_login, and the semantics (1 = the WebUI password prompt is
+    enabled, so unauthenticated POSTs are refused with 100003) are attested by the login handling in
+    zbchristian/huawei_hilink_api and vzakharchenko/huawei-hilink. The envelope here is the standard
+    <response> envelope with the single documented element. This is the ONE response fixture in this
+    directory that is not a capture, and it is called out here for that reason.
