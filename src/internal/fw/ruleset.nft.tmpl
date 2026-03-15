@@ -1,0 +1,42 @@
+# Only this table is ever touched. `delete table` after a bare `table` declaration makes the
+# teardown idempotent without reaching for a ruleset-wide flush, which would drop the ufw and
+# fail2ban chains and open the host silently.
+table {{ .Family }} {{ .Table }}
+delete table {{ .Family }} {{ .Table }}
+table {{ .Family }} {{ .Table }} {
+    set {{ .SetDongleIfaces }} { type ifname; }
+    set {{ .SetFencedIfaces }} { type ifname; }
+    set {{ .SetDongleGws }}    { type ipv4_addr; }
+    set {{ .SetPublicIfaces }} { type ifname; }
+    set {{ .SetPublicIPs }}    { type ipv4_addr; }
+    set {{ .SetProxyPorts }}   { type inet_service; flags interval; elements = { {{ .ProxyPortLo }}-{{ .ProxyPortHi }} } }
+    set {{ .SetBlackhole4 }}   { type ipv4_addr; flags interval;
+        elements = { 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8,
+                     169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16, 224.0.0.0/4 } }
+
+    # The gid is numeric on purpose: nft resolves group names at load time, and a missing group
+    # makes the whole ruleset fail to load while the unit still reports a successful start.
+    chain {{ .ChainOutput }} {
+        type filter hook output priority filter; policy accept;
+        meta skgid {{ .GID }} counter jump {{ .ChainEgress }}
+    }
+
+    chain {{ .ChainEgress }} {
+        # Measured: `meta skgid` also matches the SYN-ACK the listening socket emits in the output
+        # hook, so this accept has to come first or the leak rule swallows every customer handshake.
+        oifname @{{ .SetPublicIfaces }} ip saddr @{{ .SetPublicIPs }} tcp sport @{{ .SetProxyPorts }} ct state established,related counter accept comment "{{ .CommentCustomerLeg }}"
+        oifname @{{ .SetFencedIfaces }} counter reject with tcp reset comment "fence tcp reset"
+        oifname @{{ .SetFencedIfaces }} counter reject with icmpx type host-unreachable comment "fence icmpx"
+        # 192.168.10N.1 sits inside 192.168.0.0/16, so the gateway accept must precede the blackhole.
+        udp dport 53 ip daddr @{{ .SetDongleGws }} counter accept comment "dns to dongle gateway"
+        # `limit rate` is a match: over the rate the rule stops matching and evaluation falls through.
+        # Each rate-limited log therefore needs an unconditional drop behind it, or a flood escapes.
+        ip daddr @{{ .SetBlackhole4 }} limit rate 10/second burst 20 packets log prefix "{{ .LogPrefixSSRF }}" counter drop comment "ssrf log"
+        ip daddr @{{ .SetBlackhole4 }} counter drop comment "ssrf drop"
+        oifname != @{{ .SetDongleIfaces }} limit rate 10/second burst 20 packets log prefix "{{ .LogPrefixLeak }}" counter drop comment "leak log"
+        oifname != @{{ .SetDongleIfaces }} counter drop comment "leak drop"
+        tcp dport { 25, 465, 587 } counter drop comment "smtp drop"
+        ct state new oifname @{{ .SetDongleIfaces }} limit rate over 500/second burst 200 packets counter drop comment "new connection rate limit"
+        counter accept comment "default accept"
+    }
+}
