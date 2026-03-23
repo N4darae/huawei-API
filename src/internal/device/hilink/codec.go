@@ -49,21 +49,6 @@ func MarshalRequest(v any) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func MarshalResponse(v any) ([]byte, error) {
-	var buf bytes.Buffer
-	buf.WriteString(XMLProlog)
-	buf.WriteString("\n")
-	enc := xml.NewEncoder(&buf)
-	if err := enc.Encode(v); err != nil {
-		return nil, err
-	}
-	if err := enc.Flush(); err != nil {
-		return nil, err
-	}
-	buf.WriteString("\n")
-	return buf.Bytes(), nil
-}
-
 func Unmarshal(body []byte, out any) error {
 	if out == nil {
 		return nil

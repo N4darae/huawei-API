@@ -29,11 +29,10 @@ func (c *Client) DHCPSettings(ctx context.Context) (device.DHCPSettings, error) 
 }
 
 func (c *Client) SetDHCPSettings(ctx context.Context, s device.DHCPSettings) error {
-	req := DHCPRequestFrom(s)
-	return c.Post(ctx, PathDHCPSettings, req, nil)
+	return c.Post(ctx, PathDHCPSettings, dhcpRequestFrom(s), nil)
 }
 
-func DHCPRequestFrom(s device.DHCPSettings) any {
+func dhcpRequestFrom(s device.DHCPSettings) dhcpRequest {
 	lease := s.DHCPLeaseTime
 	if lease <= 0 {
 		lease = DefaultDHCPLeaseTime

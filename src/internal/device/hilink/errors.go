@@ -14,12 +14,6 @@ type errorEnvelope struct {
 	Message string   `xml:"message"`
 }
 
-type ErrorEnvelope struct {
-	XMLName xml.Name `xml:"error"`
-	Code    int      `xml:"code"`
-	Message string   `xml:"message"`
-}
-
 func DecodeError(body []byte, path string) error {
 	if rootElement(body) != "error" {
 		return nil

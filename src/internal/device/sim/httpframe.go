@@ -120,28 +120,3 @@ func replaceBlock(src []byte, tag string, body []byte) []byte {
 	out = append(out, src[inner+e:]...)
 	return out
 }
-
-func dropElements(src []byte, names ...string) []byte {
-	out := src
-	for _, n := range names {
-		open := []byte("<" + n + ">")
-		closing := []byte("</" + n + ">")
-		s := bytes.Index(out, open)
-		if s < 0 {
-			continue
-		}
-		e := bytes.Index(out[s:], closing)
-		if e < 0 {
-			continue
-		}
-		end := s + e + len(closing)
-		for end < len(out) && (out[end] == '\n' || out[end] == '\r') {
-			end++
-		}
-		next := make([]byte, 0, len(out))
-		next = append(next, out[:s]...)
-		next = append(next, out[end:]...)
-		out = next
-	}
-	return out
-}
