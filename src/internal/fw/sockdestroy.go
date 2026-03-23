@@ -241,6 +241,25 @@ func SocketsFrom(src netip.Addr) ([]inetDiagEntry, error) {
 	return out, nil
 }
 
+func HasListener(addr netip.Addr, port int) (bool, error) {
+	if !addr.IsValid() {
+		return false, ErrBadAddr
+	}
+	entries, err := listSockets(familyOf(addr), 1<<tcpListen)
+	if err != nil {
+		return false, err
+	}
+	for _, e := range entries {
+		if int(e.SPort) != port {
+			continue
+		}
+		if e.Src == addr || e.Src.IsUnspecified() {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func CountEstablishedFrom(src netip.Addr) (int, error) {
 	socks, err := SocketsFrom(src)
 	if err != nil {
