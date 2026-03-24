@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+<pci></pci>
+<sc></sc>
+<cell_id></cell_id>
+<rsrq></rsrq>
+<rsrp></rsrp>
+<rssi></rssi>
+<sinr></sinr>
+<rscp></rscp>
+<ecio></ecio>
+<psatt>1</psatt>
+<mode>2</mode>
+<lte_bandwidth></lte_bandwidth>
+<lte_bandinfo></lte_bandinfo>
+</response>

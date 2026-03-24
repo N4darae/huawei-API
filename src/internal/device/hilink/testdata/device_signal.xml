@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+<pci>82</pci>
+<sc></sc>
+<cell_id>551</cell_id>
+<rsrq>-6dB</rsrq>
+<rsrp>-102dBm</rsrp>
+<rssi>-89dBm</rssi>
+<sinr>3dB</sinr>
+<rscp></rscp>
+<ecio></ecio>
+<mode>7</mode>
+</response>

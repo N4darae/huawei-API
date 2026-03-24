@@ -1,0 +1,294 @@
+GOLDEN FIXTURE PROVENANCE
+=========================
+
+Every file in this directory is a HiLink response body copied from a third-party corpus of real
+device captures. Nothing here was written from what the client "expects" to see. The whole point of
+this directory is that the client and the simulator in internal/device/sim are written by the same
+author, so if the XML were invented both sides would agree with each other and both be wrong.
+
+Firmware quirks that are preserved deliberately and must never be "fixed":
+
+  - MaxIdelTime is misspelled in the firmware. Unit is SECONDS. Keep the spelling verbatim.
+  - Element order is the device's order, not alphabetical and not our struct order.
+  - Empty elements are written <Tag></Tag>, not <Tag/>, everywhere except the one compact error
+    sample noted below, which is how one corpus captured it.
+  - The device answers HTTP 200 with Content-Type: text/html even when the body is <error>.
+    Status code carries no information. Always parse the body.
+  - monitoring/status omits WanIPAddress entirely on some firmware builds (see the two variants).
+  - dhcp/settings carries accessipaddress and homeurl in addition to the ten documented fields.
+
+
+SUCCESS RESPONSES
+-----------------
+
+webserver_sestokinfo.xml
+    "Hacking Huawei E3372 HiLink" - blog.idorobots.org
+    https://blog.idorobots.org/entries/hacking-huawei-e3372-hilink..html
+    Device: E3372 HiLink. The SesInfo value is elided as "SessionID=..." in the original post;
+    the element structure and the TokInfo value are verbatim.
+
+device_information.xml
+    dubanoze/hilink, e3372h.py, docstring of device_information()
+    https://github.com/dubanoze/hilink/blob/master/e3372h.py
+    Device: E3372, HardwareVersion CL2E3372HM, SoftwareVersion 22.317.01.00.00.
+    This is the closest capture available to the hardware this project targets.
+
+device_basic_information.xml
+    dubanoze/hilink, e3372h.py, docstring of basic_info(). Same device.
+
+device_signal.xml
+    "Huawei E5186 AJAX API" - Jari Turkia, blog.hqcodeshop.fi
+    https://blog.hqcodeshop.fi/archives/247-Huawei-E5186-AJAX-API.html
+    Device: E5186s-22a. Kept because it is the only capture with populated signal values, which is
+    what exercises the dBm/dB unit-suffix parser.
+
+device_signal_e3372.xml
+    dubanoze/hilink, e3372h.py, docstring of device_signal(). Device: E3372.
+    All signal fields empty because the device was on WCDMA. This is the shape the parser must
+    survive without erroring, and it carries psatt/lte_bandwidth/lte_bandinfo which the E5186 lacks.
+
+monitoring_status.xml
+    vzakharchenko/huawei-hilink (npm huawei-hilink), README.md, output of
+    `huawei-hilink monitoring --exportFile=status.xml --exportFormat=xml`
+    https://github.com/vzakharchenko/huawei-hilink
+    Device: E3372h-320, firmware 11.0.1.1(H697SP1C983), WebUI 11.0.1.1(W13SP2C7201).
+    Note this firmware build has NO WanIPAddress element at all.
+
+monitoring_status_wanip.xml
+    dubanoze/hilink, e3372h.py, docstring of monitoring_status(). Device: E3372.
+    This build DOES carry WanIPAddress. Both variants are kept because the client must not require
+    the element and the simulator must be able to serve either.
+
+monitoring_traffic_statistics.xml
+    dubanoze/hilink, e3372h.py, docstring of traffic_statistics(). Device: E3372.
+
+monitoring_month_statistics.xml
+    "Huawei Modem API and Data Plan Monitor" - mrt-prodz.com
+    https://www.mrt-prodz.com/blog/view/2015/05/huawei-modem-api-and-data-plan-monitor/
+    Single-line, no whitespace between elements - that is how the device sent it and how it is
+    stored here. MonthLastClearTime is "2015-4-28": unpadded, not ISO 8601. Do not normalise it.
+
+dialup_connection.xml
+    dubanoze/hilink, e3372h.py, docstring of dialup_connection(). Device: E3372.
+    Independently corroborated at MaxIdelTime=600 by blog.hqcodeshop.fi (E5186) and at 7200/86400
+    by blog.idorobots.org (E3372). The misspelling is present in all three captures.
+
+dialup_mobile_dataswitch.xml
+    blog.hqcodeshop.fi E5186 AJAX API table, /api/dialup/mobile-dataswitch GET.
+
+net_current_plmn.xml
+    dubanoze/hilink, e3372h.py, docstring of current_plmn(). Device: E3372, Beeline KZ, Rat 2.
+
+net_register.xml
+    HSPDev/Huawei-E5180-API README and if0xx/Huawei-Hilink-API README, both showing the same
+    capture rendered through PHP var_dump of SimpleXMLElement.
+    https://github.com/HSPDev/Huawei-E5180-API
+    https://github.com/if0xx/Huawei-Hilink-API
+    Values verbatim (3 DK / 23806 / Rat 2); re-serialised from var_dump back to the XML the device
+    sent, because var_dump is a rendering of the parse, not of the wire bytes.
+
+net_net_mode.xml
+    dubanoze/hilink, e3372h.py, docstring of net_mode(). Device: E3372.
+    NetworkMode "01" = 2G only. Code table primary source:
+    Salamek/huawei-lte-api huawei_lte_api/enums/net.py NetworkModeEnum
+    ("00" auto, "01" 2G only, "02" 3G only, "03" 4G only).
+
+pin_status.xml
+    dubanoze/hilink, e3372h.py, docstring of pin_status(). Device: E3372.
+    Identical capture also in the blog.hqcodeshop.fi E5186 table.
+
+sms_sms_list.xml
+    Narf-AI/huawei-lte-api (crates.io huawei-dongle-api 0.2.1),
+    src/models/sms.rs test_sms_list_response_multiple_messages.
+    https://github.com/Narf-AI/huawei-lte-api
+    Real device capture: indices 40003/40002, dates 2025-06-09 and 2024-11-22, a real MSISDN and a
+    shortcode sender. Field casing here (Smstat/Index/Phone/Content/Date/Sca/SaveType/Priority/
+    SmsType) is the sms/sms-list casing and differs from the lowercase casing that
+    sms/sms-list-phone returns - see the note at the bottom.
+
+sms_sms_list_empty.xml
+    Empty-inbox shape from HSPDev/Huawei-E5180-API and if0xx/Huawei-Hilink-API READMEs
+    (Count 0, empty Messages container).
+
+sms_sms_list_fragment.xml
+    Narf-AI/huawei-lte-api src/models/sms.rs test_sms_list_response_missing_count, with SmsType
+    changed from 1 to 2 - this is the ONE success fixture with a substituted value, and it is
+    substituted only in that single field. SmsType 2 = MULTIPART per the primary source
+    Salamek/huawei-lte-api huawei_lte_api/enums/sms.py TypeEnum. No third-party corpus publishes a
+    captured multipart fragment, so the envelope is real and the discriminator value comes from the
+    enum table.
+
+dhcp_settings.xml
+    Element ORDER is verbatim from tnbhaeufi/Huawei-E3372h-320-IP-Range-change script.txt, a
+    bookmarklet that reads the device's dhcp/settings and POSTs it back with two octets changed.
+    https://github.com/tnbhaeufi/Huawei-E3372h-320-IP-Range-change
+    Device: E3372h-320. That order is corroborated field-for-field by Narf-AI/huawei-lte-api
+    src/models/dhcp.rs DhcpSettings, which was derived from a real device.
+    Values are the factory defaults (192.168.8.0/24, lease 86400).
+    accessipaddress and homeurl appear in the real payload and are preserved.
+
+response_ok.xml
+    The universal set-response. Captured in Narf-AI/huawei-lte-api src/models/common.rs
+    (`<response>OK</response>`) and in nicw0rm/huawei README. Also the primary source
+    Salamek/huawei-lte-api huawei_lte_api/enums/client.py ResponseEnum.OK = "OK".
+
+
+ERROR RESPONSES
+---------------
+
+The error envelope is identical for every code; only the integer changes. Two independent verbatim
+captures of the envelope exist:
+
+  (A) pretty form, one element per line, empty <message></message>
+      - arska/e3372 issue #1, POST to /api/dialup/mobile-dataswitch returning code 125002
+        https://github.com/arska/e3372/issues/1
+      - Salamek/huawei-lte-api discussion #190, user arekm, returning code 100010
+        https://github.com/Salamek/huawei-lte-api/discussions/190
+        (that capture is stored here verbatim as error_100010.xml)
+
+  (B) compact form on one line with a self-closing <message/>
+      - Narf-AI/huawei-lte-api src/models/common.rs test_check_for_api_error, code 125003
+        stored here verbatim as error_125003_compact.xml
+
+error_125002.xml   envelope (A) verbatim from arska/e3372 issue #1. Nothing substituted.
+error_100010.xml   envelope (A) verbatim from huawei-lte-api discussion #190. Nothing substituted.
+error_125003_compact.xml
+                   envelope (B) verbatim from Narf-AI/huawei-lte-api. Nothing substituted.
+
+The remaining error files are envelope (A) with the code integer taken from the firmware error
+constant table. They are NOT invented codes - each integer is attested by a primary source:
+
+error_100002.xml   ERROR_NOT_SUPPORT
+error_100003.xml   ERROR_NO_RIGHT           (this is "login required", NOT 100002)
+error_100004.xml   ERROR_BUSY / ERROR_SYSTEM_BUSY
+error_100005.xml   ERROR_FORMAT_ERROR
+error_108003.xml   ERROR_LOGIN_ALREADY_LOGINED
+error_112001.xml   ERROR_SET_NET_MODE_AND_BAND_WHEN_DAILUP_FAILED
+error_125003.xml   ERROR_WRONG_SESSION_TOKEN (pretty form of the compact capture above)
+
+    Primary source 1: Salamek/huawei-lte-api huawei_lte_api/enums/client.py ResponseCodeEnum
+        https://github.com/Salamek/huawei-lte-api/blob/master/huawei_lte_api/enums/client.py
+        100001 ERROR_SYSTEM_UNKNOWN   100002 ERROR_SYSTEM_NO_SUPPORT  100003 ERROR_SYSTEM_NO_RIGHTS
+        100004 ERROR_SYSTEM_BUSY      100005 ERROR_FORMAT_ERROR       120001 ERROR_VOICE_BUSY
+        125001 ERROR_WRONG_TOKEN      125002 ERROR_SYSTEM_CSRF        125003 ERROR_WRONG_SESSION_TOKEN
+
+    Primary source 2: HSPDev/Huawei-E5180-API README, the full firmware error constant table lifted
+    out of the WebUI. https://github.com/HSPDev/Huawei-E5180-API
+        ERROR_NOT_SUPPORT = 100002
+        ERROR_NO_RIGHT = 100003
+        ERROR_BUSY = 100004
+        ERROR_FORMAT_ERROR = 100005
+        ERROR_PARAMETER_ERROR = 100006
+        ERROR_LOGIN_NO_EXIST_USER = 108001
+        ERROR_LOGIN_PASSWORD_ERROR = 108002
+        ERROR_LOGIN_ALREADY_LOGINED = 108003
+        ERROR_LOGIN_MODIFY_PASSWORD_FAILED = 108004
+        ERROR_LOGIN_TOO_MANY_USERS_LOGINED = 108005
+        ERROR_LOGIN_USERNAME_OR_PASSWORD_ERROR = 108006
+        ERROR_LOGIN_TOO_MANY_TIMES = 108007
+        ERROR_SET_NET_MODE_AND_BAND_WHEN_DAILUP_FAILED = 112001
+        ERROR_SET_NET_SEARCH_MODE_WHEN_DAILUP_FAILED = 112002
+        ERROR_SET_NET_MODE_AND_BAND_FAILED = 112003
+        ERROR_SET_NET_SEARCH_MODE_FAILED = 112004
+        ERROR_NET_REGISTER_NET_FAILED = 112005
+        ERROR_NET_SIM_CARD_NOT_READY_STATUS = 112008
+        ERROR_UNKNOWN = 100001
+
+    Note for whoever owns internal/domain/errors.go: 100006 (ERROR_PARAMETER_ERROR) DOES exist in
+    the firmware table above. CONVENTIONS.md section 5 states it does not. It is absent from
+    huawei-lte-api's ResponseCodeEnum, which is a curated subset, not the full firmware table.
+
+
+SIM STATE CODES
+---------------
+
+    Primary source: zbchristian/huawei_hilink_api, huawei_hilink_api.sh, _enableSIM()
+    https://github.com/zbchristian/huawei_hilink_api
+
+        255  no SIM
+        256  CPIN error
+        257  ready
+        258  PIN disabled
+        259  check PIN (verification in progress)
+        260  PIN required
+        261  PUK required
+
+    261 is PUK REQUIRED. It is not a combined "PIN and PUK locked" state.
+
+
+SMS FIELD CASING
+----------------
+
+Two different casings exist and they are not interchangeable:
+
+    sms/sms-list          <Count> <Messages><Message> <Smstat> <Index> <Phone> <Content> <Date>
+                          <Sca> <SaveType> <Priority> <SmsType>
+                          Attested by Narf-AI/huawei-lte-api, HSPDev/Huawei-E5180-API,
+                          if0xx/Huawei-Hilink-API, and Salamek/huawei-lte-api Sms.Message.from_dict.
+
+    sms/sms-list-phone    <count> <messages><message> <smstat> <index> <phone> <content> <date>
+    sms/sms-list-contact  <sca> <curbox> <savetype> <priority> <smstype> <unreadcount>
+                          Attested by vzakharchenko/huawei-hilink README.
+                          These two endpoints are out of scope for v1; the casing is recorded here
+                          only so nobody "corrects" sms/sms-list to match them.
+
+
+REQUEST BODIES (not responses, kept for encoder fidelity)
+---------------------------------------------------------
+
+dhcp/settings POST, real payload from tnbhaeufi/Huawei-E3372h-320-IP-Range-change:
+
+    <?xml version="1.0" encoding="UTF-8"?><request><DnsStatus>1</DnsStatus><DhcpStartIPAddress>
+    192.168.N.100</DhcpStartIPAddress><DhcpIPAddress>192.168.N.1</DhcpIPAddress><accessipaddress>
+    </accessipaddress><homeurl>hi.link</homeurl><DhcpStatus>1</DhcpStatus><DhcpLanNetmask>
+    255.255.255.0</DhcpLanNetmask><SecondaryDns>192.168.N.1</SecondaryDns><PrimaryDns>192.168.N.1
+    </PrimaryDns><DhcpEndIPAddress>192.168.N.100</DhcpEndIPAddress><DhcpLeaseTime>86400
+    </DhcpLeaseTime></request>
+
+    The ten-field form this project sends is the one from Salamek/huawei-lte-api
+    huawei_lte_api/api/Dhcp.py set_settings, which adds ShowDnsSetting:
+        DhcpIPAddress DhcpLanNetmask DhcpStatus DhcpStartIPAddress DhcpEndIPAddress
+        DhcpLeaseTime DnsStatus PrimaryDns SecondaryDns ShowDnsSetting
+    Moving DhcpIPAddress to another /24 without moving DhcpStartIPAddress and DhcpEndIPAddress into
+    the same /24 is what makes the device answer 100005.
+
+sms/send-sms POST, from blog.idorobots.org:
+
+    <?xml version='1.0' encoding='UTF-8'?><request><Index>-1</Index><Phones><Phone>NUMBER</Phone>
+    </Phones><Sca></Sca><Content>TEXT</Content><Length>-1</Length><Reserved>1</Reserved>
+    <Date>-1</Date></request>
+
+net/net-mode POST field order, from Salamek/huawei-lte-api Net.set_net_mode:
+    NetworkMode NetworkBand LTEBand
+
+net/register POST field order, from Salamek/huawei-lte-api Net.set_register:
+    Mode Plmn Rat
+
+
+TOKEN HANDSHAKE
+---------------
+
+    GET /api/webserver/SesTokInfo yields SesInfo (the SessionID cookie) and TokInfo (one token).
+    Tokens are single-use.
+
+    zbchristian/huawei_hilink_api huawei_hilink_api.sh:
+        "store the list of 30 tokens. Each token is valid for a single request"
+        the batch arrives in the __RequestVerificationToken RESPONSE header, '#'-separated.
+
+    Salamek/huawei-lte-api huawei_lte_api/Session.py:
+        a response may instead refresh the queue via __RequestVerificationTokenone and
+        __RequestVerificationTokentwo, or via a plain __RequestVerificationToken.
+
+    Both header shapes are implemented in session.go and both are served by internal/device/sim.
+
+ADDENDUM
+--------
+
+user_hilink_login.xml
+    NO third-party capture of this response body exists in any corpus that was searched.
+    The endpoint itself is attested by Salamek/huawei-lte-api huawei_lte_api/api/User.py
+    hilink_login() -> GET user/hilink_login, and the semantics (1 = the WebUI password prompt is
+    enabled, so unauthenticated POSTs are refused with 100003) are attested by the login handling in
+    zbchristian/huawei_hilink_api and vzakharchenko/huawei-hilink. The envelope here is the standard
+    <response> envelope with the single documented element. This is the ONE response fixture in this
+    directory that is not a capture, and it is called out here for that reason.

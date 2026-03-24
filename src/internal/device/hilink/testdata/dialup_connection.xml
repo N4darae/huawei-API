@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+<RoamAutoConnectEnable>0</RoamAutoConnectEnable>
+<MaxIdelTime>600</MaxIdelTime>
+<ConnectMode>0</ConnectMode>
+<MTU>1500</MTU>
+<auto_dial_switch>1</auto_dial_switch>
+<pdp_always_on>0</pdp_always_on>
+</response>

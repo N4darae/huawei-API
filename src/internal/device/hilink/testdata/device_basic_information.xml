@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+<productfamily>LTE</productfamily>
+<classify>hilink</classify>
+<multimode>0</multimode>
+<restore_default_status>1</restore_default_status>
+<sim_save_pin_enable>0</sim_save_pin_enable>
+<devicename>E3372</devicename>
+</response>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+<DeviceName>E3372</DeviceName>
+<SerialNumber>G4PDW16623003677</SerialNumber>
+<Imei>861821032479591</Imei>
+<Imsi>401015625704899</Imsi>
+<Iccid>8999701560257048991F</Iccid>
+<Msisdn></Msisdn>
+<HardwareVersion>CL2E3372HM</HardwareVersion>
+<SoftwareVersion>22.317.01.00.00</SoftwareVersion>
+<WebUIVersion>17.100.14.02.577</WebUIVersion>
+<MacAddress1>BA:AB:BE:34:00:00</MacAddress1>
+<MacAddress2></MacAddress2>
+<ProductFamily>LTE</ProductFamily>
+<Classify>hilink</Classify>
+<supportmode>LTE|WCDMA|GSM</supportmode>
+<workmode>WCDMA</workmode>
+</response>
