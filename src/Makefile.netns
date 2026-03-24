@@ -1,0 +1,18 @@
+NETNS_PREFIX := dgl-t
+NETNS_BIN := $(BIN_DIR)/netns.test
+THREEPROXY ?= $(shell test -x third_party/3proxy/bin/3proxy && echo $(PWD)/third_party/3proxy/bin/3proxy || echo /usr/local/lib/dongled/3proxy)
+
+.PHONY: build-netns test-netns clean-netns
+
+build-netns:
+	@mkdir -p $(BIN_DIR)
+	$(GO) test -tags netns -c -o $(NETNS_BIN) ./test/netns
+
+test-netns: build-netns
+	sudo DONGLED_3PROXY_BIN=$(THREEPROXY) $(NETNS_BIN) -test.v -test.timeout 15m
+
+clean-netns:
+	@for ns in $$(ip netns list 2>/dev/null | awk '{print $$1}' | grep '^$(NETNS_PREFIX)'); do \
+	  echo "removing netns $$ns"; sudo ip netns del $$ns; \
+	done; true
+	@rm -f $(NETNS_BIN)
