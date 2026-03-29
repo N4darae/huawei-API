@@ -261,6 +261,8 @@ func TestNetnsInner(t *testing.T) {
 
 	t.Run("invariants", h.assertInvariants)
 	t.Run("negative_controls", h.assertNegativeControls)
+	t.Run("link_subscription", h.assertSubscribe)
+	t.Run("remove_slot_cleans_up", h.assertRemoveSlot)
 
 	t.Cleanup(h.stopProxies)
 }
@@ -699,5 +701,82 @@ func (h *harness) assertNegativeControls(t *testing.T) {
 	}
 	if strings.Contains(string(body), "OutgoingInterface") {
 		t.Fatal("the oif rule was measured to match zero packets and must stay deleted")
+	}
+}
+
+func (h *harness) assertSubscribe(t *testing.T) {
+	ctx, cancel := context.WithCancel(h.ctx)
+	defer cancel()
+	events, stop, err := h.live.Subscribe(ctx)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	defer stop()
+
+	if _, err := Run(h.ctx, "ip", "link", "add", "dgltmp0", "type", "dummy"); err != nil {
+		t.Fatalf("create dummy link: %v", err)
+	}
+	defer Run(h.ctx, "ip", "link", "del", "dgltmp0")
+
+	deadline := time.After(10 * time.Second)
+	for {
+		select {
+		case ev, ok := <-events:
+			if !ok {
+				t.Fatal("the subscription closed before the link event arrived")
+			}
+			if ev.Link.Name == "dgltmp0" {
+				t.Logf("link event: kind=%s name=%s operstate=%s", ev.Kind, ev.Link.Name, ev.Link.OperState)
+				return
+			}
+		case <-deadline:
+			t.Fatal("no rtnetlink link event arrived within 10s")
+		}
+	}
+}
+
+func (h *harness) assertRemoveSlot(t *testing.T) {
+	slot := testSlots[1]
+	h.proxies[slot].Stop()
+	delete(h.proxies, slot)
+
+	if err := h.applied.RemoveSlot(h.ctx, slot); err != nil {
+		t.Fatalf("RemoveSlot: %v", err)
+	}
+	for _, name := range []string{slot.LinkFileName(), slot.NetworkFileName()} {
+		if _, err := os.Stat(filepath.Join(h.netDir, name)); !os.IsNotExist(err) {
+			t.Fatalf("%s should be gone, got %v", name, err)
+		}
+	}
+	prios, err := RulePriorities(h.ctx, "")
+	if err != nil {
+		t.Fatalf("rule priorities: %v", err)
+	}
+	for _, gone := range []int{slot.RulePrioSrc(), slot.RulePrioUID()} {
+		for _, p := range prios {
+			if p == gone {
+				t.Fatalf("rule priority %d survived RemoveSlot: %v", gone, prios)
+			}
+		}
+	}
+	t.Logf("after removing slot %s the rules are %v", slot, prios)
+
+	if err := h.applied.RemoveSlot(h.ctx, slot); err != nil {
+		t.Fatalf("a second RemoveSlot must be a no-op, got %v", err)
+	}
+	if err := h.firewall.RemoveDongle(h.ctx, slot.IfaceName()); err != nil {
+		t.Fatalf("RemoveDongle: %v", err)
+	}
+	members, err := h.firewall.SetMembers(h.ctx, fw.SetDongleIfaces)
+	if err != nil {
+		t.Fatalf("SetMembers: %v", err)
+	}
+	for _, m := range members {
+		if m == slot.IfaceName() {
+			t.Fatalf("%s is still in dongle_ifaces: %v", slot.IfaceName(), members)
+		}
+	}
+	if err := h.firewall.RemoveDongle(h.ctx, slot.IfaceName()); err != nil {
+		t.Fatalf("a second RemoveDongle must be a no-op, got %v", err)
 	}
 }
