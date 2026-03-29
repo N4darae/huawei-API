@@ -1,0 +1,12 @@
+[
+  {
+    "Op": "apply_proxy",
+    "Subject": "proxy",
+    "SubjectID": "p01",
+    "Slot": 1,
+    "Reason": "proxy unit is running but a listener is not bound",
+    "Params": {
+      "unit": "dongled-proxy@px01.service"
+    }
+  }
+]

@@ -1,0 +1,34 @@
+[
+  {
+    "Op": "apply_netcfg",
+    "Subject": "node",
+    "SubjectID": "n1",
+    "Slot": 0,
+    "Reason": "global public source rule or route table names are missing",
+    "Params": {
+      "scope": "global"
+    }
+  },
+  {
+    "Op": "apply_netcfg",
+    "Subject": "slot",
+    "SubjectID": "s01",
+    "Slot": 1,
+    "Reason": "interface is not present",
+    "Params": {
+      "iface": "dg01",
+      "scope": "slot"
+    }
+  },
+  {
+    "Op": "apply_netcfg",
+    "Subject": "slot",
+    "SubjectID": "s02",
+    "Slot": 2,
+    "Reason": "interface is not present",
+    "Params": {
+      "iface": "dg02",
+      "scope": "slot"
+    }
+  }
+]

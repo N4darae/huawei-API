@@ -1,0 +1,12 @@
+[
+  {
+    "Op": "evict_proxy",
+    "Subject": "proxy",
+    "SubjectID": "p01",
+    "Slot": 1,
+    "Reason": "proxy is suspended",
+    "Params": {
+      "evict": "true"
+    }
+  }
+]

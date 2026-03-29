@@ -1,0 +1,12 @@
+[
+  {
+    "Op": "reboot_dongle",
+    "Subject": "dongle",
+    "SubjectID": "d01",
+    "Slot": 1,
+    "Reason": "dongle has not answered the hilink api",
+    "Params": {
+      "trigger": "auto_recovery"
+    }
+  }
+]

@@ -1,0 +1,13 @@
+[
+  {
+    "Op": "set_max_idle",
+    "Subject": "dongle",
+    "SubjectID": "d01",
+    "Slot": 1,
+    "Reason": "dongle would drop an idle data session",
+    "Params": {
+      "observed": "300",
+      "seconds": "0"
+    }
+  }
+]

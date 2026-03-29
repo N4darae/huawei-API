@@ -1,0 +1,12 @@
+[
+  {
+    "Op": "apply_proxy",
+    "Subject": "proxy",
+    "SubjectID": "p01",
+    "Slot": 1,
+    "Reason": "proxy unit is bound but the authenticated probe failed",
+    "Params": {
+      "unit": "dongled-proxy@px01.service"
+    }
+  }
+]

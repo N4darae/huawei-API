@@ -1,0 +1,10 @@
+[
+  {
+    "Op": "stop_proxy",
+    "Subject": "proxy",
+    "SubjectID": "p01",
+    "Slot": 1,
+    "Reason": "slot holds no dongle so the proxy has no egress",
+    "Params": null
+  }
+]
