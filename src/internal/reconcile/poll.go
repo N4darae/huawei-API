@@ -250,6 +250,10 @@ func (p *Poller) observeDevice(ctx context.Context, row domain.SlotRow, last Dev
 		out.WanIP = status.WanIP
 	}
 
+	if idle, err := dev.GetMaxIdleTime(ctx); err == nil {
+		out.MaxIdleTime = idle
+	}
+
 	if !slow {
 		return out, nil
 	}
@@ -259,9 +263,6 @@ func (p *Poller) observeDevice(ctx context.Context, row domain.SlotRow, last Dev
 	}
 	if traffic, err := dev.Traffic(ctx); err == nil {
 		out.Traffic = traffic
-	}
-	if idle, err := dev.GetMaxIdleTime(ctx); err == nil {
-		out.MaxIdleTime = idle
 	}
 	if sim, err := dev.PinStatus(ctx); err == nil {
 		out.Sim = sim

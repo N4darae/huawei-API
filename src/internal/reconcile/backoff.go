@@ -33,6 +33,9 @@ func (b Backoff) normalised() Backoff {
 	if b.Min <= 0 {
 		b.Min = DefaultBackoffMin
 	}
+	if b.Max <= 0 {
+		b.Max = DefaultBackoffMax
+	}
 	if b.Max < b.Min {
 		b.Max = b.Min
 	}
