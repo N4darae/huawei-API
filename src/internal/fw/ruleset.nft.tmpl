@@ -25,6 +25,11 @@ table {{ .Family }} {{ .Table }} {
         # Measured: `meta skgid` also matches the SYN-ACK the listening socket emits in the output
         # hook, so this accept has to come first or the leak rule swallows every customer handshake.
         oifname @{{ .SetPublicIfaces }} ip saddr @{{ .SetPublicIPs }} tcp sport @{{ .SetProxyPorts }} ct state established,related counter accept comment "{{ .CommentCustomerLeg }}"
+        # A probe run on the farm host reaches the proxy over lo, which is not in public_ifaces, so
+        # without this the reply is swallowed by the leak drop and every local health check times out.
+        # Kept as tight as the customer leg: our own public address, a proxy port, and reply traffic
+        # only, so a locally originated connection from this gid still cannot escape through lo.
+        oifname "lo" ip saddr @{{ .SetPublicIPs }} tcp sport @{{ .SetProxyPorts }} ct state established,related counter accept comment "{{ .CommentLoopbackLeg }}"
         oifname @{{ .SetFencedIfaces }} counter reject with tcp reset comment "fence tcp reset"
         oifname @{{ .SetFencedIfaces }} counter reject with icmpx type host-unreachable comment "fence icmpx"
         # 192.168.10N.1 sits inside 192.168.0.0/16, so the gateway accept must precede the blackhole.

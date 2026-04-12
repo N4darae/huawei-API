@@ -75,6 +75,66 @@ func TestCustomerLegAcceptComesBeforeEveryDrop(t *testing.T) {
 	}
 }
 
+func TestLoopbackLegIsAsTightAsTheCustomerLeg(t *testing.T) {
+	body := render(t)
+	var line string
+	for _, l := range strings.Split(body, "\n") {
+		if strings.Contains(l, `comment "`+CommentLoopbackLeg+`"`) {
+			line = strings.TrimSpace(l)
+		}
+	}
+	if line == "" {
+		t.Fatal("the farm-local probe rule is missing")
+	}
+	for _, want := range []string{
+		`oifname "lo"`,
+		"ip saddr @" + SetPublicIPs,
+		"tcp sport @" + SetProxyPorts,
+		"ct state established,related",
+		"counter",
+	} {
+		if !strings.Contains(line, want) {
+			t.Fatalf("the loopback exception must keep %q or it becomes an escape hatch: %s", want, line)
+		}
+	}
+	if strings.Contains(line, "ct state new") {
+		t.Fatal("the loopback exception must never match a locally originated new connection")
+	}
+}
+
+func TestLoopbackLegSitsBesideTheCustomerLegAndBeforeTheFence(t *testing.T) {
+	body := render(t)
+	customer := indexOfComment(t, body, CommentCustomerLeg)
+	loopback := indexOfComment(t, body, CommentLoopbackLeg)
+	fence := indexOfComment(t, body, "fence tcp reset")
+	if !(customer < loopback && loopback < fence) {
+		t.Fatalf("order must be customer leg, loopback leg, fence; got %d %d %d", customer, loopback, fence)
+	}
+	for _, later := range []string{"ssrf log", "ssrf drop", "leak log", "leak drop"} {
+		if loopback > indexOfComment(t, body, later) {
+			t.Fatalf("the loopback accept must precede %q", later)
+		}
+	}
+}
+
+func TestOnlyTheLoopbackRuleNamesAnInterfaceLiterally(t *testing.T) {
+	body := render(t)
+	var literal []string
+	for _, l := range strings.Split(body, "\n") {
+		trimmed := strings.TrimSpace(l)
+		if strings.HasPrefix(trimmed, "#") || !strings.Contains(trimmed, `oifname "`) {
+			continue
+		}
+		literal = append(literal, trimmed)
+	}
+	if len(literal) != 1 {
+		t.Fatalf("interfaces are matched through sets so they can be asserted; only the loopback rule may name one literally, got %v", literal)
+	}
+	if !strings.Contains(literal[0], CommentLoopbackLeg) {
+		t.Fatalf("unexpected literal interface match: %s", literal[0])
+	}
+}
+
 func TestDNSAcceptPrecedesTheBlackhole(t *testing.T) {
 	body := render(t)
 	if indexOfComment(t, body, "dns to dongle gateway") > indexOfComment(t, body, "ssrf log") {

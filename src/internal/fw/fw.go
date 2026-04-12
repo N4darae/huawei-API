@@ -90,9 +90,12 @@ func IgnoreAbsent(err error) error {
 	return err
 }
 
+const CommentLoopbackLeg = "farm-local probe leg"
+
 func EgressRuleOrder() []string {
 	return []string{
 		CommentCustomerLeg,
+		CommentLoopbackLeg,
 		"fence tcp reset",
 		"fence icmpx",
 		"dns to dongle gateway",

@@ -91,6 +91,7 @@ type rulesetView struct {
 	SetProxyPorts      string
 	SetBlackhole4      string
 	CommentCustomerLeg string
+	CommentLoopbackLeg string
 	LogPrefixSSRF      string
 	LogPrefixLeak      string
 }
@@ -112,6 +113,7 @@ func (n *Nft) Render() ([]byte, error) {
 		SetProxyPorts:      SetProxyPorts,
 		SetBlackhole4:      SetBlackhole4,
 		CommentCustomerLeg: CommentCustomerLeg,
+		CommentLoopbackLeg: CommentLoopbackLeg,
 		LogPrefixSSRF:      LogPrefixSSRF,
 		LogPrefixLeak:      LogPrefixLeak,
 	}
@@ -304,6 +306,10 @@ func (n *Nft) IsFenced(ctx context.Context, iface string) (bool, error) {
 }
 
 func (n *Nft) CustomerAcceptHits(ctx context.Context) (uint64, error) {
+	return n.RuleHits(ctx, CommentCustomerLeg)
+}
+
+func (n *Nft) RuleHits(ctx context.Context, comment string) (uint64, error) {
 	out, err := n.exec(ctx, nil, n.nft, "-j", "list", "chain", n.family, n.table, ChainEgress)
 	if err != nil {
 		return 0, err
@@ -313,7 +319,7 @@ func (n *Nft) CustomerAcceptHits(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 	for _, obj := range doc.Nftables {
-		if obj.Rule == nil || obj.Rule.Comment != CommentCustomerLeg {
+		if obj.Rule == nil || obj.Rule.Comment != comment {
 			continue
 		}
 		for _, e := range obj.Rule.Expr {
@@ -331,7 +337,7 @@ func (n *Nft) CustomerAcceptHits(ctx context.Context) (uint64, error) {
 		}
 		return 0, nil
 	}
-	return 0, ErrNoCustomerRule
+	return 0, fmt.Errorf("%w: %s", ErrNoCustomerRule, comment)
 }
 
 func (n *Nft) SetMembers(ctx context.Context, set string) ([]string, error) {
