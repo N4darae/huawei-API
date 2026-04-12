@@ -36,10 +36,11 @@ const (
 )
 
 var (
-	PublicIP  = netip.MustParseAddr("10.90.0.1")
-	CustIP    = netip.MustParseAddr("10.90.0.2")
-	WebTarget = netip.MustParseAddr("8.8.8.8")
-	DNSServer = netip.MustParseAddr("1.1.1.1")
+	PublicIP   = netip.MustParseAddr("10.90.0.1")
+	CustIP     = netip.MustParseAddr("10.90.0.2")
+	WebTarget  = netip.MustParseAddr("8.8.8.8")
+	DNSServer  = netip.MustParseAddr("1.1.1.1")
+	LocalDecoy = netip.MustParseAddr("203.0.113.9")
 
 	ErrNotRoot     = errors.New("netns: the suite needs root and must never fall back to the fake backends")
 	ErrRootNetns   = errors.New("netns: refusing to touch the root network namespace")
@@ -162,6 +163,7 @@ func (t *Topology) buildPublicLeg(ctx context.Context) error {
 		{"ip", "link", "add", PublicIf, "netns", HostNS, "type", "veth", "peer", "name", CustIf, "netns", CustNS},
 		{"ip", "-n", HostNS, "addr", "add", PublicIP.String() + "/24", "dev", PublicIf},
 		{"ip", "-n", HostNS, "link", "set", PublicIf, "up"},
+		{"ip", "-n", HostNS, "addr", "add", LocalDecoy.String() + "/32", "dev", "lo"},
 		{"ip", "-n", CustNS, "addr", "add", CustIP.String() + "/24", "dev", CustIf},
 		{"ip", "-n", CustNS, "link", "set", CustIf, "up"},
 		{"ip", "-n", CustNS, "addr", "add", WebTarget.String() + "/32", "dev", "lo"},

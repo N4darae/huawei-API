@@ -5,6 +5,7 @@ package netns
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/netip"
 	"os"
 	"os/exec"
@@ -24,6 +25,7 @@ import (
 var testSlots = []domain.Slot{domain.Slot(1), domain.Slot(2)}
 
 const (
+	decoyPort = 19999
 	proxyUser = "cust_netnstest"
 	proxyPass = "Kq7mZr2xTn9wLb4V"
 )
@@ -257,7 +259,8 @@ func TestNetnsInner(t *testing.T) {
 	t.Run("A3_customer_leg_handshake_completes", h.assertCustomerLeg)
 	t.Run("A4_sock_destroy_kills_a_hung_connection", h.assertSockDestroy)
 	t.Run("A6_rule_counters_read_with_reset_rules", h.assertCounters)
-	t.Run("leak_drop_blocks_a_farm_local_probe", h.assertLocalProbeIsDropped)
+	t.Run("A7_farm_local_probe_completes", h.assertLocalProbeCompletes)
+	t.Run("A8_loopback_rule_is_not_an_escape_hatch", h.assertLoopbackIsNotAnEscapeHatch)
 
 	t.Run("invariants", h.assertInvariants)
 	t.Run("negative_controls", h.assertNegativeControls)
@@ -425,6 +428,10 @@ func (h *harness) socksFetch(t *testing.T, s domain.Slot, url string, hostname b
 }
 
 func (h *harness) assertEgressPerDongle(t *testing.T) {
+	loopBefore, err := h.firewall.RuleHits(h.ctx, fw.CommentLoopbackLeg)
+	if err != nil {
+		t.Fatalf("RuleHits: %v", err)
+	}
 	for _, s := range testSlots {
 		body := h.socksFetch(t, s, "http://"+WebTarget.String()+"/egress", false)
 		t.Logf("slot %s -> %q", s, body)
@@ -439,6 +446,14 @@ func (h *harness) assertEgressPerDongle(t *testing.T) {
 			t.Fatalf("slot %s egressed through the public uplink: %q", s, body)
 		}
 	}
+	loopAfter, err := h.firewall.RuleHits(h.ctx, fw.CommentLoopbackLeg)
+	if err != nil {
+		t.Fatalf("RuleHits: %v", err)
+	}
+	if loopAfter != loopBefore {
+		t.Fatalf("real customer traffic matched the loopback exception %d times; it must only ever carry farm-local probes", loopAfter-loopBefore)
+	}
+	t.Logf("customer traffic did not touch the farm-local probe rule (%d matches)", loopBefore)
 }
 
 func (h *harness) assertDNSContained(t *testing.T) {
@@ -594,23 +609,6 @@ func (h *harness) assertCounters(t *testing.T) {
 		t.Fatal("the customer accept rule did not count the new request")
 	}
 	t.Logf("after reset rules, one customer request produced %d matches on the customer-facing accept", hits)
-}
-
-func (h *harness) assertLocalProbeIsDropped(t *testing.T) {
-	slot := testSlots[0]
-	ok, err := fw.HasListener(PublicIP, slot.SocksPort())
-	if err != nil || !ok {
-		t.Fatalf("the listener must still be bound: ok=%v err=%v", ok, err)
-	}
-	start := time.Now()
-	_, err = Run(h.ctx, "timeout", "4", "bash", "-c",
-		fmt.Sprintf("exec 3<>/dev/tcp/%s/%d", PublicIP, slot.SocksPort()))
-	elapsed := time.Since(start)
-	if err == nil {
-		t.Fatal("a probe from the farm host itself must not complete: the SYN-ACK leaves via lo, which is not in public_ifaces, so the leak rule drops it")
-	}
-	t.Logf("farm-local probe to %s:%d did not complete after %s (%v); health checks must come from outside",
-		PublicIP, slot.SocksPort(), elapsed.Round(time.Millisecond), err)
 }
 
 func (h *harness) assertInvariants(t *testing.T) {
@@ -779,4 +777,95 @@ func (h *harness) assertRemoveSlot(t *testing.T) {
 	if err := h.firewall.RemoveDongle(h.ctx, slot.IfaceName()); err != nil {
 		t.Fatalf("a second RemoveDongle must be a no-op, got %v", err)
 	}
+}
+
+func (h *harness) assertLocalProbeCompletes(t *testing.T) {
+	slot := testSlots[0]
+	before, err := h.firewall.RuleHits(h.ctx, fw.CommentLoopbackLeg)
+	if err != nil {
+		t.Fatalf("RuleHits: %v", err)
+	}
+
+	out, err := RunIn(h.ctx, "", "curl", "-sS", "--max-time", "8", "--socks5",
+		fmt.Sprintf("%s:%s@%s:%d", proxyUser, proxyPass, PublicIP, slot.SocksPort()),
+		"http://"+WebTarget.String()+"/local-probe")
+	if err != nil {
+		t.Fatalf("an authenticated probe run on the farm host itself must complete: %v", err)
+	}
+	body := strings.TrimSpace(string(out))
+	t.Logf("farm-local authenticated probe through slot %s -> %q", slot, body)
+	if !strings.HasPrefix(body, "dongle-01 ") {
+		t.Fatalf("the local probe did not reach the dongle responder: %q", body)
+	}
+
+	after, err := h.firewall.RuleHits(h.ctx, fw.CommentLoopbackLeg)
+	if err != nil {
+		t.Fatalf("RuleHits: %v", err)
+	}
+	if after <= before {
+		t.Fatalf("the farm-local probe rule counted %d packets before and %d after; something else carried the reply", before, after)
+	}
+	t.Logf("farm-local probe leg matched %d packets", after-before)
+}
+
+func (h *harness) assertLoopbackIsNotAnEscapeHatch(t *testing.T) {
+	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", LocalDecoy, decoyPort))
+	if err != nil {
+		t.Fatalf("decoy listener: %v", err)
+	}
+	defer ln.Close()
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			c.Close()
+		}
+	}()
+
+	loopBefore, err := h.firewall.RuleHits(h.ctx, fw.CommentLoopbackLeg)
+	if err != nil {
+		t.Fatalf("RuleHits: %v", err)
+	}
+	leakBefore, err := h.leakHits()
+	if err != nil {
+		t.Fatalf("leak hits: %v", err)
+	}
+
+	_, err = Run(h.ctx, "setpriv", "--regid", fmt.Sprint(config.GroupGID), "--clear-groups",
+		"curl", "-sS", "--max-time", "4", "--interface", PublicIP.String(),
+		fmt.Sprintf("http://%s:%d/", LocalDecoy, decoyPort))
+	if err == nil {
+		t.Fatal("gid 6100 opened a new outbound connection over lo; the loopback exception is an escape hatch")
+	}
+	t.Logf("gid %d could not open a new connection over lo to %s:%d (%v)", config.GroupGID, LocalDecoy, decoyPort, err)
+
+	loopAfter, err := h.firewall.RuleHits(h.ctx, fw.CommentLoopbackLeg)
+	if err != nil {
+		t.Fatalf("RuleHits: %v", err)
+	}
+	if loopAfter != loopBefore {
+		t.Fatalf("the farm-local probe rule matched %d new packets; it must only ever match replies from a proxy port", loopAfter-loopBefore)
+	}
+	leakAfter, err := h.leakHits()
+	if err != nil {
+		t.Fatalf("leak hits: %v", err)
+	}
+	if leakAfter <= leakBefore {
+		t.Fatalf("the attempt never reached the leak drop (%d -> %d), so this test proved nothing", leakBefore, leakAfter)
+	}
+	t.Logf("the attempt was dropped by the leak rules (%d -> %d matches)", leakBefore, leakAfter)
+}
+
+func (h *harness) leakHits() (uint64, error) {
+	var total uint64
+	for _, comment := range []string{"leak log", "leak drop"} {
+		n, err := h.firewall.RuleHits(h.ctx, comment)
+		if err != nil {
+			return 0, err
+		}
+		total += n
+	}
+	return total, nil
 }
