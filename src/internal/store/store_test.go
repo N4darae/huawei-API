@@ -308,3 +308,136 @@ func TestLastBackupAtIsZeroBeforeAnyBackup(t *testing.T) {
 		t.Fatalf("LastBackupAt is %s before any backup ran, want the zero time", got)
 	}
 }
+
+func TestProxyUpdateRewritesEveryField(t *testing.T) {
+	s, _ := openStore(t)
+	ctx := context.Background()
+	seedNode(t, s)
+	one := seedSlot(t, s, 1)
+	two := seedSlot(t, s, 2)
+	p := seedProxy(t, s, "p1", one.ID, 1)
+
+	if err := s.Customers().Create(ctx, domain.Customer{ID: "c1", Name: "Acme"}); err != nil {
+		t.Fatalf("Create customer: %v", err)
+	}
+	customer := "c1"
+	expires := domain.UnixMillis(baseTime.Add(24 * time.Hour))
+
+	p.SlotID = two.ID
+	p.CustomerID = &customer
+	p.ExpiresAt = &expires
+	p.Suspended = true
+	p.SocksPort = domain.Slot(2).SocksPort()
+	p.HTTPPort = domain.Slot(2).HTTPPort()
+	p.Username = "cust_moved"
+	p.Password = "Zz00Yy11Xx22Ww33"
+	p.AuthMode = domain.AuthIPList
+	p.Policy = domain.ProxyPolicy{AllowedPorts: []domain.PortRange{{Lo: 443, Hi: 443}}, MaxConn: 7, ConnLimit: 3}
+	if err := s.Proxies().Update(ctx, p); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	got, err := s.Proxies().Get(ctx, "p1")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got.SlotID != two.ID || !got.Suspended || got.Username != "cust_moved" {
+		t.Fatalf("update did not persist: %+v", got)
+	}
+	if got.Password != "Zz00Yy11Xx22Ww33" {
+		t.Fatalf("password is %q", got.Password)
+	}
+	if got.AuthMode != domain.AuthIPList || got.Policy.MaxConn != 7 {
+		t.Fatalf("auth or policy did not persist: %+v", got)
+	}
+	if got.CustomerID == nil || *got.CustomerID != "c1" || got.ExpiresAt == nil || *got.ExpiresAt != expires {
+		t.Fatalf("customer or expiry did not persist: %+v", got)
+	}
+}
+
+func TestSlotListIsScopedAndOrdered(t *testing.T) {
+	s, _ := openStore(t)
+	ctx := context.Background()
+	seedNode(t, s)
+	seedSlot(t, s, 3)
+	seedSlot(t, s, 1)
+	seedSlot(t, s, 2)
+
+	rows, err := s.Slots().List(ctx, "n1")
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("List returned %d rows", len(rows))
+	}
+	for i, r := range rows {
+		if r.Slot != domain.Slot(i+1) {
+			t.Fatalf("List is not ordered by slot: index %d holds %d", i, int(r.Slot))
+		}
+	}
+	all, err := s.Slots().List(ctx, "")
+	if err != nil || len(all) != 3 {
+		t.Fatalf("an empty node filter returned %d rows, err %v", len(all), err)
+	}
+	none, err := s.Slots().List(ctx, "other")
+	if err != nil || len(none) != 0 {
+		t.Fatalf("an unknown node returned %d rows, err %v", len(none), err)
+	}
+}
+
+func TestStoreAccessorsAndIntegrityCheck(t *testing.T) {
+	s, _ := openStore(t)
+	ctx := context.Background()
+	seedNode(t, s)
+
+	if s.Path() == "" || s.DB() == nil || s.Sealer() == nil {
+		t.Fatal("the store does not expose its path, handle and sealer")
+	}
+	if err := s.IntegrityCheck(ctx); err != nil {
+		t.Fatalf("IntegrityCheck on a live database: %v", err)
+	}
+	if err := s.Tx(ctx, func(tx *Tx) error {
+		if tx.Unwrap() == nil {
+			t.Error("Tx does not expose the underlying sql.Tx")
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("Tx: %v", err)
+	}
+}
+
+func TestCloseIsIdempotentAndTxRefusesAfterwards(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "dongled.db"), testSealer(t),
+		WithClock(&fixedClock{t: baseTime}), WithMaxOpenConns(2))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	if s.maxOpen != 2 {
+		t.Fatalf("WithMaxOpenConns did not apply, pool holds %d", s.maxOpen)
+	}
+	if err := s.Migrate(context.Background()); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatalf("second Close: %v", err)
+	}
+	if err := s.Tx(context.Background(), func(*Tx) error { return nil }); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Tx after Close returned %v, want ErrClosed", err)
+	}
+}
+
+func TestMigrateRefusesADatabaseFromTheFuture(t *testing.T) {
+	s, _ := openStore(t)
+	ctx := context.Background()
+
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO schema_migrations(version,name,applied_at) VALUES(99,'from_the_future',1)`); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := s.Migrate(ctx); !errors.Is(err, ErrSchemaAhead) {
+		t.Fatalf("Migrate against a newer schema returned %v, want ErrSchemaAhead", err)
+	}
+}
