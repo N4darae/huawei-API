@@ -1,0 +1,7 @@
+repo=https://github.com/3proxy/3proxy.git
+tag=0.9.8
+commit=122ca26249aaaac9156e0805891555c70e19f2b3
+makefile=Makefile.Linux
+flags=WOLFSSL_CHECK=false OPENSSL_CHECK=false PCRE_CHECK=false PAM_CHECK=false
+artifact=bin/3proxy
+install=/usr/local/lib/dongled/3proxy
