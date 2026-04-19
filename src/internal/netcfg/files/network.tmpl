@@ -1,0 +1,33 @@
+[Match]
+Name={{ .IfName }}
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+Address={{ .HostPrefix }}
+DHCP=no
+IPv6AcceptRA=no
+LinkLocalAddressing=no
+ConfigureWithoutCarrier=yes
+IgnoreCarrierLoss=yes
+
+[Route]
+Destination=0.0.0.0/0
+Gateway={{ .Gateway }}
+Table={{ .Table }}
+
+[Route]
+Destination={{ .Subnet }}
+Scope=link
+Table={{ .Table }}
+
+[RoutingPolicyRule]
+From={{ .HostPrefix32 }}
+Table={{ .Table }}
+Priority={{ .PrioSrc }}
+
+[RoutingPolicyRule]
+User={{ .UID }}-{{ .UID }}
+Table={{ .Table }}
+Priority={{ .PrioUID }}
