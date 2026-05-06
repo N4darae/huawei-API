@@ -156,6 +156,12 @@ func (e *Engine) Sweeps() int {
 	return e.sweeps
 }
 
+func (e *Engine) LastKick() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.lastKick
+}
+
 func (e *Engine) Kick(reason string) {
 	select {
 	case e.kick <- reason:

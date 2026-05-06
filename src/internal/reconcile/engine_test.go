@@ -513,6 +513,9 @@ func TestEngineKickIsNonBlockingAndCoalesces(t *testing.T) {
 	if got := len(rig.engine.kick); got != KickBuffer {
 		t.Fatalf("the kick channel holds %d entries, want %d coalesced", got, KickBuffer)
 	}
+	if rig.engine.LastKick() != "" {
+		t.Fatal("a kick that Run has not consumed yet must not be reported as handled")
+	}
 }
 
 func TestEngineRunStopsOnContextCancel(t *testing.T) {

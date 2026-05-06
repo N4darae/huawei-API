@@ -3,7 +3,6 @@ package reconcile
 import (
 	"context"
 	"net/netip"
-	"sort"
 	"time"
 
 	"github.com/n4darae/huawei-API/src/internal/domain"
@@ -236,13 +235,4 @@ func newObservedState() ObservedState {
 		ProxyStatus: map[domain.Slot]proxysup.Status{},
 		Devices:     map[domain.Slot]DeviceObservation{},
 	}
-}
-
-func sortedTargets(m map[string]uint64) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
 }

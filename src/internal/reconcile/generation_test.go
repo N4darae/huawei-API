@@ -120,14 +120,3 @@ func TestEngineHoldsGraceWhenASweepCouldNotComplete(t *testing.T) {
 		t.Fatal("a cold cache must hold grace open even when the process grace has elapsed")
 	}
 }
-
-func TestSortedTargetsIsStable(t *testing.T) {
-	in := map[string]uint64{"proxy:p03": 1, "dongle:d01": 2, "proxy:p01": 3}
-	got := sortedTargets(in)
-	want := []string{"dongle:d01", "proxy:p01", "proxy:p03"}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("sortedTargets returned %v, want %v", got, want)
-		}
-	}
-}
