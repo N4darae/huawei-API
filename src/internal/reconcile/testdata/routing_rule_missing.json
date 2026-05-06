@@ -1,0 +1,13 @@
+[
+  {
+    "Op": "apply_netcfg",
+    "Subject": "slot",
+    "SubjectID": "s01",
+    "Slot": 1,
+    "Reason": "slot routing rule is missing",
+    "Params": {
+      "iface": "dg01",
+      "scope": "slot"
+    }
+  }
+]

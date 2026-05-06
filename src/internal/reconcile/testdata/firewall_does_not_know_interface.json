@@ -1,0 +1,13 @@
+[
+  {
+    "Op": "add_fw_dongle",
+    "Subject": "slot",
+    "SubjectID": "s02",
+    "Slot": 2,
+    "Reason": "interface is not a member of the firewall dongle set",
+    "Params": {
+      "gateway": "192.168.102.1",
+      "iface": "dg02"
+    }
+  }
+]

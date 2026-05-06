@@ -1,0 +1,23 @@
+[
+  {
+    "Op": "mark_expired",
+    "Subject": "proxy",
+    "SubjectID": "p01",
+    "Slot": 1,
+    "Reason": "proxy expiry passed",
+    "Params": {
+      "expires_at": "1786186800000"
+    }
+  },
+  {
+    "Op": "evict_proxy",
+    "Subject": "proxy",
+    "SubjectID": "p01",
+    "Slot": 1,
+    "Reason": "proxy expiry passed",
+    "Params": {
+      "evict": "true",
+      "expires_at": "1786186800000"
+    }
+  }
+]

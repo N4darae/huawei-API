@@ -1,0 +1,14 @@
+[
+  {
+    "Op": "recover_rotate",
+    "Subject": "proxy",
+    "SubjectID": "p02",
+    "Slot": 2,
+    "Reason": "dongle data session is not connected",
+    "Params": {
+      "conn_status": "902",
+      "dongle_id": "d02",
+      "trigger": "auto_recovery"
+    }
+  }
+]

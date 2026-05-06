@@ -1,0 +1,13 @@
+[
+  {
+    "Op": "apply_netcfg",
+    "Subject": "slot",
+    "SubjectID": "s01",
+    "Slot": 1,
+    "Reason": "slot route table has no default route",
+    "Params": {
+      "iface": "dg01",
+      "scope": "slot"
+    }
+  }
+]
