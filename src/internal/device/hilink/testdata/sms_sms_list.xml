@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+    <Count>2</Count>
+    <Messages>
+        <Message>
+            <Smstat>0</Smstat>
+            <Index>40003</Index>
+            <Phone>+48616673870</Phone>
+            <Content>Test message 1</Content>
+            <Date>2025-06-09 17:08:58</Date>
+            <Sca></Sca>
+            <SaveType>0</SaveType>
+            <Priority>0</Priority>
+            <SmsType>1</SmsType>
+        </Message>
+        <Message>
+            <Smstat>1</Smstat>
+            <Index>40002</Index>
+            <Phone>3350</Phone>
+            <Content>Test message 2</Content>
+            <Date>2024-11-22 12:32:12</Date>
+            <Sca></Sca>
+            <SaveType>0</SaveType>
+            <Priority>0</Priority>
+            <SmsType>5</SmsType>
+        </Message>
+    </Messages>
+</response>
