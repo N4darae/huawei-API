@@ -322,6 +322,9 @@ func TestFenceAndUnfenceRoundTrip(t *testing.T) {
 	f := newFakeNft()
 	n := NewNft(Options{Exec: f.exec})
 	ctx := context.Background()
+	if err := n.AddDongle(ctx, "dg01", netip.MustParseAddr("192.168.101.1")); err != nil {
+		t.Fatalf("AddDongle: %v", err)
+	}
 	if fenced, err := n.IsFenced(ctx, "dg01"); err != nil || fenced {
 		t.Fatalf("IsFenced before: %v %v", fenced, err)
 	}
@@ -336,6 +339,22 @@ func TestFenceAndUnfenceRoundTrip(t *testing.T) {
 	}
 	if fenced, err := n.IsFenced(ctx, "dg01"); err != nil || fenced {
 		t.Fatalf("IsFenced after unfence: %v %v", fenced, err)
+	}
+}
+
+func TestIsFencedReportsAnUnknownInterfaceAsAnError(t *testing.T) {
+	f := newFakeNft()
+	n := NewNft(Options{Exec: f.exec})
+	ctx := context.Background()
+	if _, err := n.IsFenced(ctx, "dg07"); !errors.Is(err, ErrUnknownIface) {
+		t.Fatalf("an interface absent from dongle_ifaces must be distinguishable from a known unfenced one, else the reconciler never emits ActAddFwDongle and dongle_ifaces stays empty; got %v", err)
+	}
+	if err := n.AddDongle(ctx, "dg07", netip.MustParseAddr("192.168.107.1")); err != nil {
+		t.Fatalf("AddDongle: %v", err)
+	}
+	fenced, err := n.IsFenced(ctx, "dg07")
+	if err != nil || fenced {
+		t.Fatalf("IsFenced after AddDongle: %v %v", fenced, err)
 	}
 }
 

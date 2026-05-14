@@ -2,6 +2,7 @@ package fw
 
 import (
 	"context"
+	"errors"
 	"net/netip"
 )
 
@@ -33,6 +34,8 @@ func AllSets() []string {
 		SetBlackhole4,
 	}
 }
+
+var ErrUnknownIface = errors.New("fw: interface not in dongle_ifaces")
 
 type Firewall interface {
 	EnsureTable(ctx context.Context) error

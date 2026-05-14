@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
@@ -293,16 +294,18 @@ func (n *Nft) Unfence(ctx context.Context, iface string) error {
 }
 
 func (n *Nft) IsFenced(ctx context.Context, iface string) (bool, error) {
+	known, err := n.SetMembers(ctx, SetDongleIfaces)
+	if err != nil {
+		return false, err
+	}
+	if !slices.Contains(known, iface) {
+		return false, ErrUnknownIface
+	}
 	members, err := n.SetMembers(ctx, SetFencedIfaces)
 	if err != nil {
 		return false, err
 	}
-	for _, m := range members {
-		if m == iface {
-			return true, nil
-		}
-	}
-	return false, nil
+	return slices.Contains(members, iface), nil
 }
 
 func (n *Nft) CustomerAcceptHits(ctx context.Context) (uint64, error) {
