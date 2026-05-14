@@ -56,8 +56,16 @@ if [ ! -x "${built}" ]; then
     exit 1
 fi
 
-if "${built}" 2>&1 | head -n 1 | grep -qi 'usage'; then
-    :
+probe="$(mktemp)"
+trap 'rm -f "${probe}"' EXIT
+printf 'nscache 65536\ntimeouts 1 5 30 60 180 1800 15 60 10 5\nnoforce\nauth strong\nusers "probe:CL:Aa1Bb2Cc3Dd4Ee5F"\ninternal 127.0.0.1\nflush\nallow probe\ndeny *\nsocks -p20999 -a -4\n' >"${probe}"
+
+rc=0
+timeout 5 "${built}" "${probe}" >/dev/null 2>&1 || rc=$?
+if [ "${rc}" != 124 ]; then
+    echo "the freshly built binary did not stay up on a minimal config (exit ${rc})" >&2
+    echo "3proxy exits 0 without opening a listener when it rejects a directive" >&2
+    exit 1
 fi
 
 install -D -m 0755 "${built}" "${INSTALL_PATH}"

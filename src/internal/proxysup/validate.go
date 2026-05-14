@@ -10,7 +10,6 @@ import (
 	"net/netip"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -336,11 +335,4 @@ func parseHexAddrPort(s string) (netip.AddrPort, bool) {
 		return netip.AddrPortFrom(netip.AddrFrom16(b), uint16(p)), true
 	}
 	return netip.AddrPort{}, false
-}
-
-func ProcNetPath(root string) string {
-	if root == "" {
-		return "/proc/net/tcp"
-	}
-	return filepath.Join(root, "net", "tcp")
 }

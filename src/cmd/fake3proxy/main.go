@@ -48,9 +48,27 @@ func (l *listenList) Set(v string) error {
 	return nil
 }
 
+type credList map[string]string
+
+func (c credList) String() string {
+	out := make([]string, 0, len(c))
+	for k := range c {
+		out = append(out, k)
+	}
+	return strings.Join(out, ",")
+}
+
+func (c credList) Set(v string) error {
+	user, pass, ok := strings.Cut(v, ":")
+	if !ok || user == "" {
+		return fmt.Errorf("want <user>:<password>, got %q", v)
+	}
+	c[user] = pass
+	return nil
+}
+
 type server struct {
-	user string
-	pass string
+	creds credList
 
 	mu        sync.Mutex
 	listeners []net.Listener
@@ -59,10 +77,10 @@ type server struct {
 
 func main() {
 	var listens listenList
+	creds := credList{}
 	fs := flag.NewFlagSet("fake3proxy", flag.ContinueOnError)
 	fs.Var(&listens, "listen", "repeatable, socks5://host:port or http://host:port")
-	user := fs.String("user", "", "username the fake accepts")
-	pass := fs.String("pass", "", "password the fake accepts")
+	fs.Var(creds, "cred", "repeatable, <user>:<password> the fake accepts")
 	failListen := fs.Bool("fail-listen", false, "bind nothing and exit 0, mimicking a rejected acl keyword")
 	dropOnReload := fs.Bool("drop-on-reload", false, "close every listener on SIGUSR1 and stay alive")
 	exitAfter := fs.Duration("exit-after", 0, "exit after this delay")
@@ -81,7 +99,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	s := &server{user: *user, pass: *pass}
+	s := &server{creds: creds}
 	if err := s.start(listens); err != nil {
 		fmt.Fprintln(os.Stderr, "fake3proxy:", err)
 		os.Exit(1)
@@ -174,9 +192,9 @@ func (s *server) serveSocks(c net.Conn) {
 		return
 	}
 	chosen := byte(0x00)
-	authed := s.user == ""
+	authed := len(s.creds) == 0
 	for _, m := range methods {
-		if m == 0x02 && s.user != "" {
+		if m == 0x02 && len(s.creds) > 0 {
 			chosen = 0x02
 		}
 	}
@@ -188,7 +206,8 @@ func (s *server) serveSocks(c net.Conn) {
 		if err != nil {
 			return
 		}
-		authed = u == s.user && p == s.pass
+		known, ok := s.creds[u]
+		authed = ok && known == p
 		if _, err := c.Write([]byte{0x01, 0x00}); err != nil {
 			return
 		}
@@ -263,20 +282,24 @@ func (s *server) serveHTTP(c net.Conn) {
 		}
 	}
 
-	if s.user != "" && !credOK(cred, s.user, s.pass) {
+	if len(s.creds) > 0 && !s.credOK(cred) {
 		c.Write([]byte("HTTP/1.0 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"proxy\"\r\nConnection: close\r\n\r\n"))
 		return
 	}
 	c.Write([]byte("HTTP/1.0 502 Bad Gateway\r\nConnection: close\r\n\r\n"))
 }
 
-func credOK(cred, user, pass string) bool {
+func (s *server) credOK(cred string) bool {
 	raw, err := base64.StdEncoding.DecodeString(cred)
 	if err != nil {
 		return false
 	}
 	u, p, ok := strings.Cut(string(raw), ":")
-	return ok && u == user && p == pass
+	if !ok {
+		return false
+	}
+	known, found := s.creds[u]
+	return found && known == p
 }
 
 func readFull(c net.Conn, b []byte) (int, error) {

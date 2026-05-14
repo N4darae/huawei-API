@@ -129,8 +129,7 @@ func (r *fakeRunner) spawn() error {
 		"-listen", "http://127.0.0.1:" + strconv.Itoa(r.http),
 	}
 	for name, pass := range ConfigUsers(cfg) {
-		args = append(args, "-user", name, "-pass", pass)
-		break
+		args = append(args, "-cred", name+":"+pass)
 	}
 	args = append(args, r.cfgPath)
 
@@ -183,9 +182,26 @@ func waitClosed(ports ...int) {
 	}
 }
 
-func newHarness(t *testing.T) (*sup, *fakeRunner, Spec) {
+func traversableTempDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
+	if os.Geteuid() != 0 {
+		return dir
+	}
+	for p := dir; p != "/" && p != "."; p = filepath.Dir(p) {
+		if err := os.Chmod(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if filepath.Dir(p) == "/tmp" {
+			break
+		}
+	}
+	return dir
+}
+
+func newHarness(t *testing.T) (*sup, *fakeRunner, Spec) {
+	t.Helper()
+	dir := traversableTempDir(t)
 	sp := NewSpec(supervisorSlot, netip.MustParseAddr("127.0.0.1"), netip.MustParseAddr("1.1.1.1"))
 	sp.ConfigPath = filepath.Join(dir, sp.UserName()+".cfg")
 	sp.LogPath = filepath.Join(dir, sp.UserName()+".log")
@@ -412,14 +428,50 @@ func TestNewSystemdRequiresAPublicBind(t *testing.T) {
 	}
 }
 
+func TestNewSystemdRefusesToRunInTheProxyGroup(t *testing.T) {
+	_, err := NewSystemd(Options{
+		InternalIP: netip.MustParseAddr("127.0.0.1"),
+		Groups:     func() ([]int, error) { return []int{0, config.GroupGID}, nil },
+	})
+	if !errors.Is(err, ErrProbeGroup) {
+		t.Fatalf("err = %v, want ErrProbeGroup: nft drops a new outbound connection from gid %d over lo", err, config.GroupGID)
+	}
+	if _, err := NewSystemd(Options{
+		InternalIP:      netip.MustParseAddr("127.0.0.1"),
+		AllowProxyGroup: true,
+		Groups:          func() ([]int, error) { return []int{0, config.GroupGID}, nil },
+	}); err != nil {
+		t.Fatalf("the documented escape hatch must still construct: %v", err)
+	}
+}
+
+func TestEnsureGroupReadableAcceptsAWorldTraversableTree(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("the check only runs as root, where the proxy user is a different identity")
+	}
+	dir := traversableTempDir(t)
+	if err := ensureGroupReadable(dir, config.GroupGID); err != nil {
+		t.Fatalf("0755 tree rejected: %v", err)
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureGroupReadable(dir, config.GroupGID); !errors.Is(err, ErrConfUnreadable) {
+		t.Fatalf("err = %v, want ErrConfUnreadable", err)
+	}
+}
+
 func TestNewSystemdDefaults(t *testing.T) {
 	s, err := NewSystemd(Options{InternalIP: netip.MustParseAddr("127.0.0.1")})
 	if err != nil {
 		t.Fatal(err)
 	}
 	o := s.(*sup).opt
-	if o.Bin != config.Bin3proxy || o.Systemctl != "systemctl" || o.ProcNetTCP != ProcNetTCP {
+	if o.Bin != config.Bin3proxy || o.Systemctl != "systemctl" || o.ConfDir != config.ProxyConfDir {
 		t.Fatalf("%+v", o)
+	}
+	if o.HasListener == nil {
+		t.Fatal("listener check must default to the netlink probe")
 	}
 	if o.ProbeDelay < 1200*time.Millisecond {
 		t.Fatalf("probe delay %s must clear the dual-listener window", o.ProbeDelay)

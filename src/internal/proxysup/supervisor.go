@@ -16,10 +16,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/n4darae/huawei-API/src/internal/config"
 	"github.com/n4darae/huawei-API/src/internal/domain"
+	"github.com/n4darae/huawei-API/src/internal/fw"
 )
 
 const (
@@ -47,8 +49,10 @@ const (
 )
 
 var (
-	ErrRollback     = errors.New("supervise: apply failed and the previous config was restored")
-	ErrPathMismatch = errors.New("supervise: spec paths must match the directories the unit can read and write")
+	ErrRollback       = errors.New("supervise: apply failed and the previous config was restored")
+	ErrPathMismatch   = errors.New("supervise: spec paths must match the directories the unit can read and write")
+	ErrProbeGroup     = errors.New("supervise: the probe must not run in the proxy group, nft drops its outbound syn on lo")
+	ErrConfUnreadable = errors.New("supervise: the proxy user cannot reopen this config on reload, which fails silently with zero listeners")
 )
 
 type DialFunc func(ctx context.Context, network, address string) (net.Conn, error)
@@ -76,14 +80,16 @@ type Options struct {
 	LogDir          string
 	InternalIP      netip.Addr
 	Systemctl       string
-	ProcNetTCP      string
 	ProbeTarget     netip.AddrPort
 	ProbeDelay      time.Duration
 	ProbeTimeout    time.Duration
 	ValidateTimeout time.Duration
 	SkipValidate    bool
 	AllowFallback   bool
+	AllowProxyGroup bool
 	Dial            DialFunc
+	HasListener     func(netip.Addr, int) (bool, error)
+	Groups          func() ([]int, error)
 	Clock           domain.Clock
 	OnValidate      func(ValidateReport)
 	runner          unitRunner
@@ -109,8 +115,11 @@ func NewSystemd(o Options) (Supervisor, error) {
 	if o.Systemctl == "" {
 		o.Systemctl = "systemctl"
 	}
-	if o.ProcNetTCP == "" {
-		o.ProcNetTCP = ProcNetTCP
+	if o.HasListener == nil {
+		o.HasListener = fw.HasListener
+	}
+	if o.Groups == nil {
+		o.Groups = processGroups
 	}
 	if !o.ProbeTarget.IsValid() {
 		o.ProbeTarget = netip.AddrPortFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), config.ProxyValidatePort)
@@ -133,7 +142,33 @@ func NewSystemd(o Options) (Supervisor, error) {
 	if o.runner == nil {
 		o.runner = systemdRunner{bin: o.Systemctl}
 	}
+	if !o.AllowProxyGroup {
+		if err := refuseProxyGroup(o.Groups); err != nil {
+			return nil, err
+		}
+	}
 	return &sup{opt: o}, nil
+}
+
+func processGroups() ([]int, error) {
+	gids, err := os.Getgroups()
+	if err != nil {
+		return nil, err
+	}
+	return append(gids, os.Getegid(), os.Getgid()), nil
+}
+
+func refuseProxyGroup(groups func() ([]int, error)) error {
+	gids, err := groups()
+	if err != nil {
+		return err
+	}
+	for _, g := range gids {
+		if g == config.GroupGID {
+			return fmt.Errorf("%w: gid %d is in the process group set", ErrProbeGroup, config.GroupGID)
+		}
+	}
+	return nil
 }
 
 func (s *sup) configPath(slot domain.Slot) string {
@@ -306,19 +341,18 @@ func (s *sup) inspect(ctx context.Context, slot domain.Slot, sp *Spec) Status {
 	st.Since = us.SinceMS
 	st.Running = us.ActiveState == StateActive
 
-	bound, err := listeningPorts(s.opt.ProcNetTCP, []int{slot.SocksPort(), slot.HTTPPort()})
+	socksBound, err := s.opt.HasListener(s.opt.InternalIP, slot.SocksPort())
 	if err != nil {
 		st.Error = err.Error()
 		return st
 	}
-	for _, p := range bound {
-		switch p {
-		case slot.SocksPort():
-			st.SocksBound = true
-		case slot.HTTPPort():
-			st.HTTPBound = true
-		}
+	httpBound, err := s.opt.HasListener(s.opt.InternalIP, slot.HTTPPort())
+	if err != nil {
+		st.Error = err.Error()
+		return st
 	}
+	st.SocksBound = socksBound
+	st.HTTPBound = httpBound
 	if !st.SocksBound || !st.HTTPBound {
 		st.Error = fmt.Sprintf("listener missing: socks=%v http=%v", st.SocksBound, st.HTTPBound)
 		return st
@@ -393,7 +427,41 @@ func installConfig(path string, cfg []byte, gid int) error {
 		return err
 	}
 	defer d.Close()
-	return d.Sync()
+	if err := d.Sync(); err != nil {
+		return err
+	}
+	return ensureGroupReadable(dir, gid)
+}
+
+func ensureGroupReadable(dir string, gid int) error {
+	if os.Geteuid() != 0 {
+		return nil
+	}
+	for p := filepath.Clean(dir); ; p = filepath.Dir(p) {
+		info, err := os.Stat(p)
+		if err != nil {
+			return err
+		}
+		mode := info.Mode().Perm()
+		st, ok := info.Sys().(*syscall.Stat_t)
+		owned := ok && int(st.Gid) == gid
+		switch {
+		case mode&0o001 != 0 && mode&0o004 != 0:
+		case owned && mode&0o010 != 0 && mode&0o040 != 0:
+		default:
+			return fmt.Errorf("%w: %s is mode %04o gid %d, the proxy needs traverse and read", ErrConfUnreadable, p, mode, gidOf(st, ok))
+		}
+		if p == "/" || filepath.Dir(p) == p {
+			return nil
+		}
+	}
+}
+
+func gidOf(st *syscall.Stat_t, ok bool) int {
+	if !ok {
+		return -1
+	}
+	return int(st.Gid)
 }
 
 func readConfig(path string) ([]byte, bool) {
