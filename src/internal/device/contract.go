@@ -42,17 +42,22 @@ func (b SMSBox) Valid() bool { return b >= SMSBoxInbox && b <= SMSBoxDraft }
 type SimState int
 
 const (
-	SimStateReady        SimState = 257
-	SimStatePINRequired  SimState = 259
-	SimStatePUKRequired  SimState = 260
-	SimStatePINPUKLocked SimState = 261
+	SimStateNoSIM       SimState = 255
+	SimStateCPINError   SimState = 256
+	SimStateReady       SimState = 257
+	SimStatePINDisabled SimState = 258
+	SimStatePINChecking SimState = 259
+	SimStatePINRequired SimState = 260
+	SimStatePUKRequired SimState = 261
 )
 
-func (s SimState) Ready() bool { return s == SimStateReady }
+func (s SimState) Ready() bool { return s == SimStateReady || s == SimStatePINDisabled }
 
 func (s SimState) Locked() bool {
-	return s == SimStatePINRequired || s == SimStatePUKRequired || s == SimStatePINPUKLocked
+	return s == SimStatePINChecking || s == SimStatePINRequired || s == SimStatePUKRequired
 }
+
+func (s SimState) Usable() bool { return s.Ready() }
 
 type ConnStatus int
 
