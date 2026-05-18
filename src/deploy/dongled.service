@@ -1,0 +1,88 @@
+# dongled — panel + reconcile engine.
+#
+# Install to /etc/systemd/system/dongled.service.
+#
+# Three lines in this file are load-bearing. If you "clean them up", the farm
+# breaks in ways that produce no log line at all:
+#
+#   1. RestrictAddressFamilies MUST list AF_NETLINK. netcfg, the rtnetlink link
+#      watcher, SOCK_DESTROY and the conntrack flush all speak netlink. Drop it
+#      and every one of them fails at runtime with EAFNOSUPPORT, long after the
+#      unit has reported "started".
+#   2. There is deliberately NO `Group=dongled` and NO
+#      `SupplementaryGroups=dongled`. The nft egress chain matches
+#      `meta skgid 6100`; a health probe that runs inside gid 6100 has its own
+#      SYN evaluated by that chain and dropped, which looks exactly like a dead
+#      proxy. proxysup.NewSystemd refuses to construct if it finds gid 6100 in
+#      its own group set, so this mistake fails closed at startup.
+#   3. ExecStartPre runs the fatal half of the preflight. If the priority-900
+#      rule, rp_filter or the nft table are missing, starting the panel would
+#      silently sell broken proxies.
+#
+# The `--` before the subcommand flags is required: the global flag set is
+# parsed before the subcommand sees its arguments.
+
+[Unit]
+Description=dongled proxy farm controller
+Documentation=file:///usr/local/share/dongled/docs/OPERATIONS.md
+After=network-online.target systemd-networkd.service nftables.service
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=notify
+NotifyAccess=main
+ExecStartPre=/usr/local/bin/dongled preflight -- --fatal-only
+ExecStart=/usr/local/bin/dongled serve
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=120s
+TimeoutStopSec=30s
+WatchdogSec=0
+
+Environment=DONGLED_LOG_LEVEL=info
+EnvironmentFile=-/etc/dongled/dongled.env
+LoadCredentialEncrypted=kek:/etc/dongled/kek.cred
+
+RuntimeDirectory=dongled
+RuntimeDirectoryPreserve=yes
+StateDirectory=dongled
+StateDirectoryMode=0750
+LogsDirectory=dongled
+LogsDirectoryMode=0750
+ConfigurationDirectory=dongled
+WorkingDirectory=/var/lib/dongled
+
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_SETUID CAP_SETGID CAP_CHOWN CAP_DAC_OVERRIDE
+NoNewPrivileges=yes
+
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectProc=invisible
+PrivateTmp=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_INET AF_UNIX AF_NETLINK
+
+# ProtectKernelTunables is NOT set: netcfg reads /proc/sys to assert rp_filter
+# and ip_forward. It only reads; the sysctl drop-in owns the writes.
+
+ReadWritePaths=/etc/systemd/network
+ReadWritePaths=/etc/iproute2/rt_tables.d
+ReadWritePaths=/etc/dongled/proxy
+ReadWritePaths=/var/backups/dongled
+
+[Install]
+WantedBy=multi-user.target
