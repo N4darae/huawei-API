@@ -77,3 +77,6 @@ node_modules/
 !/src/internal/webui/dist/
 !/src/internal/webui/dist/index.html
 !/src/internal/webui/dist/.gitkeep
+
+# Golden test fixtures captured from the real 3proxy binary, otherwise eaten by *.log above.
+!/src/internal/proxysup/testdata/*.log
