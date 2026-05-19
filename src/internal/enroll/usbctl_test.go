@@ -163,8 +163,8 @@ func TestUSBNetsSeparatesProvisionedFromFactoryFresh(t *testing.T) {
 	if err != nil {
 		t.Fatalf("USBNets: %v", err)
 	}
-	if len(nets) != 2 {
-		t.Fatalf("USBNets returned %d entries, want dg01 and usb0: %+v", len(nets), nets)
+	if len(nets) != 3 {
+		t.Fatalf("USBNets returned %d entries, want dg01, usb0 and usb1: %+v", len(nets), nets)
 	}
 	byName := map[string]USBNet{}
 	for _, n := range nets {
