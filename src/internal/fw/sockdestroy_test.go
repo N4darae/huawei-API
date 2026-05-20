@@ -3,11 +3,15 @@ package fw
 import (
 	"context"
 	"encoding/binary"
-	"net"
+	"errors"
 	"net/netip"
-	"syscall"
+	"runtime"
 	"testing"
+
+	"github.com/n4darae/huawei-API/src/internal/domain"
 )
+
+const afUnix = 1
 
 func TestKillableStatesExcludesListen(t *testing.T) {
 	mask := killableStates()
@@ -24,11 +28,11 @@ func TestEncodeDiagReqLayout(t *testing.T) {
 	for i := range id {
 		id[i] = byte(i)
 	}
-	req := encodeDiagReq(syscall.AF_INET, syscall.IPPROTO_TCP, 0x1234, id)
+	req := encodeDiagReq(afInet, protoTCP, 0x1234, id)
 	if len(req) != sizeofDiagReq {
 		t.Fatalf("request is %d bytes, want %d", len(req), sizeofDiagReq)
 	}
-	if req[0] != syscall.AF_INET || req[1] != syscall.IPPROTO_TCP {
+	if req[0] != afInet || req[1] != protoTCP {
 		t.Fatalf("family/protocol %d/%d", req[0], req[1])
 	}
 	if got := binary.NativeEndian.Uint32(req[4:8]); got != 0x1234 {
@@ -43,7 +47,7 @@ func TestEncodeDiagReqLayout(t *testing.T) {
 
 func TestParseDiagMsgRoundTrip(t *testing.T) {
 	msg := make([]byte, sizeofDiagMsg)
-	msg[0] = syscall.AF_INET
+	msg[0] = afInet
 	msg[1] = tcpEstablished
 	id := msg[4 : 4+sizeofSockID]
 	binary.BigEndian.PutUint16(id[0:2], 34567)
@@ -74,7 +78,7 @@ func TestParseDiagMsgRejectsShortInput(t *testing.T) {
 		t.Fatal("a truncated message must be rejected")
 	}
 	msg := make([]byte, sizeofDiagMsg)
-	msg[0] = syscall.AF_UNIX
+	msg[0] = afUnix
 	if _, ok := parseDiagMsg(msg); ok {
 		t.Fatal("a non-inet family must be rejected")
 	}
@@ -90,39 +94,13 @@ func TestKillSocketsRejectsTheZeroAddress(t *testing.T) {
 	}
 }
 
-func TestKillSocketsReturnsZeroForAnAddressWithNoSockets(t *testing.T) {
+func TestKillSocketsRefusesOffLinux(t *testing.T) {
+	if runtime.GOOS == "linux" {
+		t.Skip("linux opens a real netlink socket, covered by sockdestroy_linux_test.go")
+	}
 	n := NewNft(Options{Exec: newFakeNft().exec})
-	killed, err := n.KillSockets(context.Background(), netip.MustParseAddr("192.0.2.222"))
-	if err != nil {
-		t.Fatalf("KillSockets: %v", err)
-	}
-	if killed != 0 {
-		t.Fatalf("want a real zero, got %d", killed)
-	}
-}
-
-func TestSocketDiagSeesALoopbackConnection(t *testing.T) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Skipf("cannot listen: %v", err)
-	}
-	defer ln.Close()
-	client, err := net.Dial("tcp", ln.Addr().String())
-	if err != nil {
-		t.Fatalf("dial: %v", err)
-	}
-	defer client.Close()
-	server, err := ln.Accept()
-	if err != nil {
-		t.Fatalf("accept: %v", err)
-	}
-	defer server.Close()
-
-	got, err := CountEstablishedFrom(netip.MustParseAddr("127.0.0.1"))
-	if err != nil {
-		t.Fatalf("CountEstablishedFrom: %v", err)
-	}
-	if got < 2 {
-		t.Fatalf("the diag dump must see both ends of a loopback connection, got %d", got)
+	_, err := n.KillSockets(context.Background(), netip.MustParseAddr("192.0.2.222"))
+	if !errors.Is(err, domain.ErrUnsupportedPlatform) {
+		t.Fatalf("a fence that cannot kill sockets must say so, got %v", err)
 	}
 }
