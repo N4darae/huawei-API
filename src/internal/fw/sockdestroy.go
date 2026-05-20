@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"net/netip"
-	"syscall"
 )
 
 const (
@@ -18,7 +17,18 @@ const (
 	sizeofSockID   = 48
 	sizeofDiagReq  = 8 + sizeofSockID
 	sizeofDiagMsg  = 4 + sizeofSockID + 20
-	sizeofNlMsgHdr = syscall.NLMSG_HDRLEN
+	sizeofNlMsgHdr = 16
+
+	nlmsgError = 0x2
+	nlmsgDone  = 0x3
+
+	nlmFRequest = 0x001
+	nlmFAck     = 0x004
+	nlmFDump    = 0x300
+
+	afInet   = 2
+	afInet6  = 10
+	protoTCP = 6
 
 	tcpEstablished = 1
 	tcpListen      = 10
@@ -36,119 +46,6 @@ func killableStates() uint32 {
 		mask |= 1 << uint(s)
 	}
 	return mask
-}
-
-type netlinkConn struct {
-	fd  int
-	seq uint32
-}
-
-func dialNetlink(proto int) (*netlinkConn, error) {
-	fd, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW|syscall.SOCK_CLOEXEC, proto)
-	if err != nil {
-		return nil, err
-	}
-	if err := syscall.Bind(fd, &syscall.SockaddrNetlink{Family: syscall.AF_NETLINK}); err != nil {
-		syscall.Close(fd)
-		return nil, err
-	}
-	tv := syscall.Timeval{Sec: 5}
-	if err := syscall.SetsockoptTimeval(fd, syscall.SOL_SOCKET, syscall.SO_RCVTIMEO, &tv); err != nil {
-		syscall.Close(fd)
-		return nil, err
-	}
-	return &netlinkConn{fd: fd}, nil
-}
-
-func (c *netlinkConn) Close() error { return syscall.Close(c.fd) }
-
-func (c *netlinkConn) send(kind uint16, flags uint16, payload []byte) error {
-	c.seq++
-	msg := make([]byte, sizeofNlMsgHdr+len(payload))
-	binary.NativeEndian.PutUint32(msg[0:4], uint32(len(msg)))
-	binary.NativeEndian.PutUint16(msg[4:6], kind)
-	binary.NativeEndian.PutUint16(msg[6:8], flags)
-	binary.NativeEndian.PutUint32(msg[8:12], c.seq)
-	copy(msg[sizeofNlMsgHdr:], payload)
-	return syscall.Sendto(c.fd, msg, 0, &syscall.SockaddrNetlink{Family: syscall.AF_NETLINK})
-}
-
-func (c *netlinkConn) dump(kind uint16, payload []byte) ([][]byte, error) {
-	if err := c.send(kind, syscall.NLM_F_REQUEST|syscall.NLM_F_DUMP, payload); err != nil {
-		return nil, err
-	}
-	var out [][]byte
-	for {
-		buf := make([]byte, 1<<17)
-		n, _, err := syscall.Recvfrom(c.fd, buf, 0)
-		if err != nil {
-			return nil, err
-		}
-		if n < sizeofNlMsgHdr {
-			return nil, ErrMalformedNetlink
-		}
-		msgs, err := syscall.ParseNetlinkMessage(buf[:n])
-		if err != nil {
-			return nil, err
-		}
-		done := false
-		for _, m := range msgs {
-			switch m.Header.Type {
-			case syscall.NLMSG_DONE:
-				done = true
-			case syscall.NLMSG_ERROR:
-				if err := decodeNetlinkError(m.Data); err != nil {
-					return nil, err
-				}
-				done = true
-			default:
-				out = append(out, m.Data)
-			}
-		}
-		if done {
-			break
-		}
-	}
-	return out, nil
-}
-
-func (c *netlinkConn) request(kind uint16, payload []byte) error {
-	if err := c.send(kind, syscall.NLM_F_REQUEST|syscall.NLM_F_ACK, payload); err != nil {
-		return err
-	}
-	for {
-		buf := make([]byte, 1<<16)
-		n, _, err := syscall.Recvfrom(c.fd, buf, 0)
-		if err != nil {
-			return err
-		}
-		if n < sizeofNlMsgHdr {
-			return ErrMalformedNetlink
-		}
-		msgs, err := syscall.ParseNetlinkMessage(buf[:n])
-		if err != nil {
-			return err
-		}
-		for _, m := range msgs {
-			switch m.Header.Type {
-			case syscall.NLMSG_ERROR:
-				return decodeNetlinkError(m.Data)
-			case syscall.NLMSG_DONE:
-				return nil
-			}
-		}
-	}
-}
-
-func decodeNetlinkError(data []byte) error {
-	if len(data) < 4 {
-		return ErrMalformedNetlink
-	}
-	code := int32(binary.NativeEndian.Uint32(data[0:4]))
-	if code == 0 {
-		return nil
-	}
-	return syscall.Errno(-code)
 }
 
 type inetDiagEntry struct {
@@ -184,10 +81,10 @@ func parseDiagMsg(data []byte) (inetDiagEntry, bool) {
 	e.SPort = binary.BigEndian.Uint16(id[0:2])
 	e.DPort = binary.BigEndian.Uint16(id[2:4])
 	switch e.Family {
-	case syscall.AF_INET:
+	case afInet:
 		e.Src = netip.AddrFrom4([4]byte(id[4:8]))
 		e.Dst = netip.AddrFrom4([4]byte(id[20:24]))
-	case syscall.AF_INET6:
+	case afInet6:
 		e.Src = netip.AddrFrom16([16]byte(id[4:20])).Unmap()
 		e.Dst = netip.AddrFrom16([16]byte(id[20:36])).Unmap()
 	default:
@@ -200,9 +97,9 @@ func parseDiagMsg(data []byte) (inetDiagEntry, bool) {
 
 func familyOf(a netip.Addr) uint8 {
 	if a.Is4() {
-		return syscall.AF_INET
+		return afInet
 	}
-	return syscall.AF_INET6
+	return afInet6
 }
 
 func listSockets(family uint8, states uint32) ([]inetDiagEntry, error) {
@@ -211,7 +108,7 @@ func listSockets(family uint8, states uint32) ([]inetDiagEntry, error) {
 		return nil, err
 	}
 	defer c.Close()
-	payloads, err := c.dump(sockDiagByFamily, encodeDiagReq(family, syscall.IPPROTO_TCP, states, nil))
+	payloads, err := c.dump(sockDiagByFamily, encodeDiagReq(family, protoTCP, states, nil))
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +192,7 @@ func (n *Nft) KillSockets(ctx context.Context, src netip.Addr) (int, error) {
 		if ctx.Err() != nil {
 			return killed, ctx.Err()
 		}
-		req := encodeDiagReq(t.Family, syscall.IPPROTO_TCP, 0, t.ID)
+		req := encodeDiagReq(t.Family, protoTCP, 0, t.ID)
 		if err := c.request(sockDestroy, req); err != nil {
 			continue
 		}
