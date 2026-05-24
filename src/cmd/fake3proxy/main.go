@@ -108,8 +108,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	usr := make(chan os.Signal, 4)
-	signal.Notify(usr, syscall.SIGUSR1)
+	usr := reloadSignal()
 
 	var timeout <-chan time.Time
 	if *exitAfter > 0 {
