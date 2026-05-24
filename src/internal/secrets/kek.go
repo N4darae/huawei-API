@@ -57,8 +57,9 @@ func ReadKEK(path string) ([]byte, error) {
 		return nil, fmt.Errorf("%w: %s: %v", ErrKEKMissing, path, err)
 	case info.IsDir():
 		return nil, fmt.Errorf("%w: %s is a directory", ErrKEKMissing, path)
-	case info.Mode().Perm()&0o077 != 0:
-		return nil, fmt.Errorf("%w: %s is mode %04o", ErrKEKPermissions, path, info.Mode().Perm())
+	}
+	if err := checkKEKPermissions(info, path); err != nil {
+		return nil, err
 	}
 
 	raw, err := os.ReadFile(path)
