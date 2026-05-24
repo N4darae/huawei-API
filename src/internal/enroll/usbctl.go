@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/n4darae/huawei-API/src/internal/domain"
 	"github.com/n4darae/huawei-API/src/internal/netcfg"
@@ -24,8 +23,6 @@ const (
 
 	portEnable  = "0\n"
 	portDisable = "1\n"
-
-	usbdevfsReset = 0x5514
 )
 
 var (
@@ -260,16 +257,4 @@ func (c *USBController) USBNets() ([]USBNet, error) {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Iface < out[j].Iface })
 	return out, nil
-}
-
-func ioctlReset(path string) error {
-	f, err := os.OpenFile(path, os.O_WRONLY, 0)
-	if err != nil {
-		return fmt.Errorf("enroll: open %s: %w", path, err)
-	}
-	defer f.Close()
-	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), usbdevfsReset, 0); errno != 0 {
-		return fmt.Errorf("enroll: USBDEVFS_RESET on %s: %w", path, errno)
-	}
-	return nil
 }
