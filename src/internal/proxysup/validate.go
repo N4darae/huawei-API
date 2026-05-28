@@ -127,11 +127,7 @@ func validateNetns(ctx context.Context, req ValidateRequest) (ValidateReport, er
 		req.Bin, path,
 	}
 	cmd := exec.Command("sh", args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWNET,
-		Setpgid:    true,
-		Pdeathsig:  syscall.SIGKILL,
-	}
+	cmd.SysProcAttr = netnsSysProcAttr()
 
 	want := req.Spec.Ports()
 	rep, err := runAndWait(ctx, cmd, want, len(want), req.Timeout)
@@ -151,7 +147,7 @@ func validateScratch(ctx context.Context, req ValidateRequest) (ValidateReport, 
 	defer cleanup()
 
 	cmd := exec.Command(req.Bin, path)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pdeathsig: syscall.SIGKILL}
+	cmd.SysProcAttr = scratchSysProcAttr()
 
 	rep, err := runAndWait(ctx, cmd, []int{req.ScratchPort}, services, req.Timeout)
 	rep.Mode = ValidateScratch
@@ -229,7 +225,7 @@ func runAndWait(ctx context.Context, cmd *exec.Cmd, ports []int, want int, timeo
 	go func() { done <- cmd.Wait() }()
 
 	defer func() {
-		syscall.Kill(-pid, syscall.SIGKILL)
+		killProcessGroup(pid)
 		cmd.Process.Kill()
 		<-done
 	}()
