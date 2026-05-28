@@ -1,0 +1,296 @@
+import { useMemo, useState } from 'react'
+import { Badge, Button, Dot, Input, Meter, Notice, Select, Table } from '../../design'
+import type { Column } from '../../design'
+import type { Proxy, ProxyState } from '../../api/keys'
+import { useNow, useOp, useProxies } from '../../api/query'
+import { useSearchParam } from '../../router'
+import { ExportPanel } from './ExportPanel'
+import { ProxyDrawer } from './ProxyDrawer'
+import {
+  PROXY_STATE_TONE,
+  formatBytes,
+  formatExpiry,
+  signalText,
+  signalTone,
+} from './format'
+
+const STATES: ProxyState[] = ['active', 'suspended', 'disabled', 'expired', 'degraded', 'unknown']
+
+function PortsCell({ proxy }: { proxy: Proxy }) {
+  const s = proxy.ports_bound.socks
+  const h = proxy.ports_bound.http
+  return (
+    <span className="row" style={{ gap: 10 }}>
+      <span className="row" style={{ gap: 4 }}>
+        <span className="mono">S</span>
+        <Dot
+          filled={s}
+          tone={s ? 'ok' : 'danger'}
+          label={s ? 'SOCKS listener observed bound' : 'SOCKS listener NOT bound'}
+        />
+      </span>
+      <span className="row" style={{ gap: 4 }}>
+        <span className="mono">H</span>
+        <Dot
+          filled={h}
+          tone={h ? 'ok' : 'danger'}
+          label={h ? 'HTTP listener observed bound' : 'HTTP listener NOT bound'}
+        />
+      </span>
+      {proxy.ports_bound.probe_ok === false ? <span className="faint">probe failed</span> : null}
+    </span>
+  )
+}
+
+function RowOp({ opId }: { opId: string }) {
+  const { op, stalled } = useOp(opId)
+  if (!op) return <span className="faint">starting…</span>
+  if (stalled) return <Badge tone="warn">stalled at {op.step}</Badge>
+  return (
+    <Badge tone="info">
+      {op.kind} · {op.step} {op.pct}%
+    </Badge>
+  )
+}
+
+function ActionsCell({
+  proxy,
+  onOpen,
+  onRotate,
+}: {
+  proxy: Proxy
+  onOpen: () => void
+  onRotate: () => void
+}) {
+  if (proxy.active_operation_id) {
+    return (
+      <span className="row">
+        <RowOp opId={proxy.active_operation_id} />
+        <Button onClick={onOpen}>Open</Button>
+      </span>
+    )
+  }
+  return (
+    <span className="row">
+      <Button variant="primary" onClick={onRotate} aria-label={`Rotate ${proxy.id}`}>
+        Rotate
+      </Button>
+      <Button onClick={onOpen} aria-label={`Open ${proxy.id}`}>
+        Open
+      </Button>
+    </span>
+  )
+}
+
+export function ProxiesPage() {
+  const [selected, setSelected] = useSearchParam('proxy')
+  const [autoRotate, setAutoRotate] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [state, setState] = useState<'' | ProxyState>('')
+  const [expiring, setExpiring] = useState('')
+  const [term, setTerm] = useState('')
+  const now = useNow(30_000)
+
+  const query = useMemo(
+    () => ({
+      state: state === '' ? undefined : state,
+      expiring_within_days: expiring === '' ? undefined : Number(expiring),
+    }),
+    [state, expiring],
+  )
+
+  const list = useProxies(query)
+  const items = list.data?.items ?? []
+
+  const rows = useMemo(() => {
+    const t = term.trim().toLowerCase()
+    if (t === '') return items
+    return items.filter((p) =>
+      [p.id, p.host, p.username, p.wan_ip ?? '', p.customer_name ?? '', String(p.slot)]
+        .join(' ')
+        .toLowerCase()
+        .includes(t),
+    )
+  }, [items, term])
+
+  const unbound = items.filter((p) => !p.ports_bound.socks || !p.ports_bound.http).length
+  const overQuota = items.filter(
+    (p) => (p.data_cap_bytes ?? 0) > 0 && (p.data_used_bytes ?? 0) / (p.data_cap_bytes as number) >= 0.9,
+  ).length
+
+  const columns: ReadonlyArray<Column<Proxy>> = [
+    {
+      key: 'status',
+      header: 'Status',
+      width: '110px',
+      cell: (p) => <Badge tone={PROXY_STATE_TONE[p.state]}>{p.state}</Badge>,
+    },
+    {
+      key: 'proxy',
+      header: 'Proxy',
+      width: '250px',
+      cell: (p) => (
+        <span className="col" style={{ gap: 0 }}>
+          <span className="mono">
+            {p.host}:{p.socks_port}
+          </span>
+          <span className="faint mono">
+            slot {p.slot} · http {p.http_port} · {p.username}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: 'customer',
+      header: 'Customer',
+      width: '150px',
+      cell: (p) =>
+        p.customer_name || p.customer_id ? (
+          <span>{p.customer_name || p.customer_id}</span>
+        ) : (
+          <span className="faint">unassigned</span>
+        ),
+    },
+    {
+      key: 'expires',
+      header: 'Expires',
+      width: '120px',
+      cell: (p) => {
+        const e = formatExpiry(p.expires_at, now)
+        return e.tone === 'neutral' ? <span className="muted">{e.text}</span> : <Badge tone={e.tone}>{e.text}</Badge>
+      },
+    },
+    {
+      key: 'wan',
+      header: 'WAN IP',
+      width: '130px',
+      cell: (p) => (p.wan_ip ? <span className="mono">{p.wan_ip}</span> : <span className="faint">no address</span>),
+    },
+    {
+      key: 'signal',
+      header: 'Signal',
+      width: '110px',
+      cell: (p) => (
+        <span className={'mono ' + (signalTone(p.signal_bars) === 'danger' ? '' : 'muted')}>
+          {signalText(p.signal_bars)}
+        </span>
+      ),
+    },
+    {
+      key: 'data',
+      header: 'Data (SIM quota)',
+      width: '170px',
+      cell: (p) => (
+        <Meter
+          label={`SIM quota used for ${p.id}`}
+          value={p.data_used_bytes ?? 0}
+          max={p.data_cap_bytes ?? 0}
+          format={formatBytes}
+        />
+      ),
+    },
+    {
+      key: 'ports',
+      header: 'Ports (observed)',
+      width: '150px',
+      cell: (p) => <PortsCell proxy={p} />,
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      width: '230px',
+      cell: (p) => (
+        <ActionsCell
+          proxy={p}
+          onOpen={() => {
+            setAutoRotate(false)
+            setSelected(p.id)
+          }}
+          onRotate={() => {
+            setAutoRotate(true)
+            setSelected(p.id)
+          }}
+        />
+      ),
+    },
+  ]
+
+  return (
+    <div className="page">
+      <div className="page-head">
+        <h1 className="page-title">Proxies</h1>
+        <span className="muted">
+          {rows.length} of {items.length} shown
+        </span>
+        <span className="grow" />
+        <Button variant="primary" size="md" onClick={() => setExporting(true)}>
+          Export list
+        </Button>
+      </div>
+
+      <div className="toolbar">
+        <Input
+          label="Search"
+          value={term}
+          placeholder="id, host, customer, WAN IP"
+          onChange={(e) => setTerm(e.target.value)}
+        />
+        <Select label="State" value={state} onChange={(e) => setState(e.target.value as ProxyState | '')}>
+          <option value="">any state</option>
+          {STATES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </Select>
+        <Select label="Expiring within" value={expiring} onChange={(e) => setExpiring(e.target.value)}>
+          <option value="">any time</option>
+          <option value="3">3 days</option>
+          <option value="7">7 days</option>
+          <option value="30">30 days</option>
+        </Select>
+      </div>
+
+      {unbound > 0 ? (
+        <Notice tone="danger" title={`${unbound} proxies have a listener that is not bound`}>
+          3proxy exits 0 with no listener when its config is rejected, so &quot;running&quot; means
+          nothing. These rows show what the backend actually observed.
+        </Notice>
+      ) : null}
+
+      {overQuota > 0 ? (
+        <Notice tone="warn" title={`${overQuota} SIMs are at or above 90% of their quota`} />
+      ) : null}
+
+      {list.isError ? (
+        <Notice tone="danger" title="Could not load proxies">
+          {list.error.message}
+        </Notice>
+      ) : null}
+
+      <Table
+        caption="Proxies"
+        columns={columns}
+        rows={rows}
+        rowKey={(p) => p.id}
+        selectedKey={selected}
+        onRowActivate={(p) => {
+          setAutoRotate(false)
+          setSelected(p.id)
+        }}
+        empty={list.isPending ? 'Loading proxies…' : 'No proxies match this filter.'}
+      />
+
+      <ProxyDrawer
+        proxyId={selected}
+        autoRotate={autoRotate}
+        onClose={() => {
+          setAutoRotate(false)
+          setSelected(null)
+        }}
+      />
+
+      <ExportPanel open={exporting} proxies={rows} onClose={() => setExporting(false)} />
+    </div>
+  )
+}
