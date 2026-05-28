@@ -16,7 +16,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/n4darae/huawei-API/src/internal/config"
@@ -443,13 +442,13 @@ func ensureGroupReadable(dir string, gid int) error {
 			return err
 		}
 		mode := info.Mode().Perm()
-		st, ok := info.Sys().(*syscall.Stat_t)
-		owned := ok && int(st.Gid) == gid
+		fgid, ok := fileGID(info)
+		owned := ok && fgid == gid
 		switch {
 		case mode&0o001 != 0 && mode&0o004 != 0:
 		case owned && mode&0o010 != 0 && mode&0o040 != 0:
 		default:
-			return fmt.Errorf("%w: %s is mode %04o gid %d, the proxy needs traverse and read", ErrConfUnreadable, p, mode, gidOf(st, ok))
+			return fmt.Errorf("%w: %s is mode %04o gid %d, the proxy needs traverse and read", ErrConfUnreadable, p, mode, gidOf(fgid, ok))
 		}
 		if p == "/" || filepath.Dir(p) == p {
 			return nil
@@ -457,11 +456,11 @@ func ensureGroupReadable(dir string, gid int) error {
 	}
 }
 
-func gidOf(st *syscall.Stat_t, ok bool) int {
+func gidOf(gid int, ok bool) int {
 	if !ok {
 		return -1
 	}
-	return int(st.Gid)
+	return gid
 }
 
 func readConfig(path string) ([]byte, bool) {
