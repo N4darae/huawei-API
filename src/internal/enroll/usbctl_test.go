@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -12,6 +13,16 @@ import (
 )
 
 const fixtureSysfs = "testdata/sysfs"
+
+func requireSysfsFixture(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS != "linux" {
+		t.Skip("requires a real linux sysfs fixture, this host is " + runtime.GOOS)
+	}
+	if _, err := os.Stat(filepath.Join(fixtureSysfs, "class", "net", "dg01", "device")); err != nil {
+		t.Skip("sysfs fixture testdata/sysfs is not checked out: " + err.Error())
+	}
+}
 
 func copyTree(t *testing.T, src string) string {
 	t.Helper()
@@ -78,6 +89,7 @@ func TestPortControlDerivesTheHubPortFromTheDeviceName(t *testing.T) {
 }
 
 func TestDeviceNameResolvesThroughTheInterfaceSymlink(t *testing.T) {
+	requireSysfsFixture(t)
 	c := NewUSBController(USBOptions{SysfsRoot: fixtureSysfs})
 
 	got, err := c.DeviceName("dg01")
@@ -96,6 +108,7 @@ func TestDeviceNameResolvesThroughTheInterfaceSymlink(t *testing.T) {
 }
 
 func TestBusDevFeedsUsbresetWithNumbersNotVendorProduct(t *testing.T) {
+	requireSysfsFixture(t)
 	var reset []string
 	c := NewUSBController(USBOptions{
 		SysfsRoot: fixtureSysfs,
@@ -127,6 +140,7 @@ func TestBusDevFeedsUsbresetWithNumbersNotVendorProduct(t *testing.T) {
 }
 
 func TestDisableAndEnablePortToggleTheSysfsSwitch(t *testing.T) {
+	requireSysfsFixture(t)
 	root := copyTree(t, fixtureSysfs)
 	c := NewUSBController(USBOptions{SysfsRoot: root})
 
@@ -158,6 +172,7 @@ func TestDisableAndEnablePortToggleTheSysfsSwitch(t *testing.T) {
 }
 
 func TestUSBNetsSeparatesProvisionedFromFactoryFresh(t *testing.T) {
+	requireSysfsFixture(t)
 	c := NewUSBController(USBOptions{SysfsRoot: fixtureSysfs})
 	nets, err := c.USBNets()
 	if err != nil {

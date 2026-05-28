@@ -748,6 +748,7 @@ func TestEnrollRefusesAnOccupiedSlot(t *testing.T) {
 }
 
 func TestEnrollAllocatesTheLowestFreeSlot(t *testing.T) {
+	requireSysfsFixture(t)
 	h := newHarness(t)
 	if _, err := h.enroll(2); err != nil {
 		t.Fatalf("seed: %v", err)
@@ -825,6 +826,7 @@ func TestEnrollTimesOutWaitingForALink(t *testing.T) {
 }
 
 func TestUSBGuardDisablesEveryOtherUnprovisionedPortForTheSession(t *testing.T) {
+	requireSysfsFixture(t)
 	root := copyTree(t, fixtureSysfs)
 	h := newHarness(t)
 	h.deps.SkipUSBGuard = false
