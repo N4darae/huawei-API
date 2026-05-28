@@ -149,14 +149,6 @@ func NewSystemd(o Options) (Supervisor, error) {
 	return &sup{opt: o}, nil
 }
 
-func processGroups() ([]int, error) {
-	gids, err := os.Getgroups()
-	if err != nil {
-		return nil, err
-	}
-	return append(gids, os.Getegid(), os.Getgid()), nil
-}
-
 func refuseProxyGroup(groups func() ([]int, error)) error {
 	gids, err := groups()
 	if err != nil {

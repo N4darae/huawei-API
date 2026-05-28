@@ -12,3 +12,11 @@ func fileGID(info os.FileInfo) (int, bool) {
 	}
 	return int(st.Gid), true
 }
+
+func processGroups() ([]int, error) {
+	gids, err := os.Getgroups()
+	if err != nil {
+		return nil, err
+	}
+	return append(gids, os.Getegid(), os.Getgid()), nil
+}
