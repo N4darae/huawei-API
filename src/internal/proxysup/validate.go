@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/n4darae/huawei-API/src/internal/config"
+	"github.com/n4darae/huawei-API/src/internal/domain"
 )
 
 type ValidateMode string
@@ -139,6 +140,10 @@ func validateNetns(ctx context.Context, req ValidateRequest) (ValidateReport, er
 }
 
 func validateScratch(ctx context.Context, req ValidateRequest) (ValidateReport, error) {
+	if runtime.GOOS != "linux" {
+		return ValidateReport{}, domain.UnsupportedOn("3proxy scratch validation")
+	}
+
 	rewritten, services := scratchConfig(req.Config, req.ScratchPort)
 	path, cleanup, err := writeCandidate(req.WorkDir, rewritten)
 	if err != nil {
