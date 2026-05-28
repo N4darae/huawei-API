@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -85,7 +84,7 @@ func (r *fakeRunner) Reload(ctx context.Context, unit string) error {
 		return errors.New("unit is not running")
 	}
 	if drop {
-		if err := cmd.Process.Signal(syscall.SIGUSR1); err != nil {
+		if err := sendReloadSignal(cmd); err != nil {
 			return err
 		}
 		waitClosed(r.socks, r.http)
