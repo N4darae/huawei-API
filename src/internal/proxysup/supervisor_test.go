@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"sync"
 	"testing"
@@ -225,7 +226,15 @@ func newHarness(t *testing.T) (*sup, *fakeRunner, Spec) {
 	return s.(*sup), r, sp
 }
 
+func skipUnlessLinuxListenerDetection(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS != "linux" {
+		t.Skip("listener detection needs /proc/net/tcp and netlink sockets")
+	}
+}
+
 func TestApplyStartsAndProbes(t *testing.T) {
+	skipUnlessLinuxListenerDetection(t)
 	s, r, sp := newHarness(t)
 	ctx := context.Background()
 
@@ -264,6 +273,7 @@ func TestApplyStartsAndProbes(t *testing.T) {
 }
 
 func TestApplyReloadsWhenNothingIsRevoked(t *testing.T) {
+	skipUnlessLinuxListenerDetection(t)
 	s, r, sp := newHarness(t)
 	ctx := context.Background()
 
@@ -285,6 +295,7 @@ func TestApplyReloadsWhenNothingIsRevoked(t *testing.T) {
 }
 
 func TestApplyRestartsWhenCredentialsAreRevoked(t *testing.T) {
+	skipUnlessLinuxListenerDetection(t)
 	s, _, sp := newHarness(t)
 	ctx := context.Background()
 
@@ -306,6 +317,7 @@ func TestApplyRestartsWhenCredentialsAreRevoked(t *testing.T) {
 }
 
 func TestApplyRollsBackWhenReloadLeavesZeroListeners(t *testing.T) {
+	skipUnlessLinuxListenerDetection(t)
 	s, r, sp := newHarness(t)
 	ctx := context.Background()
 
@@ -357,6 +369,7 @@ func TestApplyRefusesToInstallAnInvalidSpec(t *testing.T) {
 }
 
 func TestStopEvictRemovesTheConfig(t *testing.T) {
+	skipUnlessLinuxListenerDetection(t)
 	s, r, sp := newHarness(t)
 	ctx := context.Background()
 	if _, err := s.Apply(ctx, sp); err != nil {
