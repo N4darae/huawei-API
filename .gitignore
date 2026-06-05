@@ -80,3 +80,6 @@ node_modules/
 
 # Golden test fixtures captured from the real 3proxy binary, otherwise eaten by *.log above.
 !/src/internal/proxysup/testdata/*.log
+
+# Windows build artefacts (go build/vet default to <package>.exe with no -o)
+/src/**/*.exe
