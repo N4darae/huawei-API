@@ -13,12 +13,38 @@ EMBED_DIST := internal/webui/dist
 
 GENERATED := $(SCHEMA_TS) $(EVENTS_TS)
 
+CROSS_GOARCH := amd64
+
 .DEFAULT_GOAL := build
 .PHONY: build run test test-race vet fmt fmt-check lint gen gen-api gen-events \
+        build-linux build-windows build-darwin cross-build \
+        vet-linux vet-windows vet-darwin cross-vet \
         check web web-install web-dev web-reset tidy clean help
 
 build:
 	$(GO) build -o $(BINARY) $(CMD)
+
+build-linux:
+	GOOS=linux GOARCH=$(CROSS_GOARCH) $(GO) build ./...
+
+build-windows:
+	GOOS=windows GOARCH=$(CROSS_GOARCH) $(GO) build ./...
+
+build-darwin:
+	GOOS=darwin GOARCH=$(CROSS_GOARCH) $(GO) build ./...
+
+cross-build: build-linux build-windows build-darwin
+
+vet-linux:
+	GOOS=linux GOARCH=$(CROSS_GOARCH) $(GO) vet ./...
+
+vet-windows:
+	GOOS=windows GOARCH=$(CROSS_GOARCH) $(GO) vet ./...
+
+vet-darwin:
+	GOOS=darwin GOARCH=$(CROSS_GOARCH) $(GO) vet ./...
+
+cross-vet: vet-linux vet-windows vet-darwin
 
 run:
 	$(GO) run $(CMD) serve
@@ -57,7 +83,7 @@ gen-api:
 gen-events:
 	$(GO) run ./tools/gen/events -out $(EVENTS_TS)
 
-check: lint gen test
+check: lint gen test cross-build cross-vet
 	@git diff --exit-code -- $(GENERATED) || { echo "generated files are stale: commit the output of make gen"; exit 1; }
 
 web-install:
