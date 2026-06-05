@@ -325,3 +325,60 @@ slot. Do not flush the rule table; other software on the box owns rules too.
 
 Keep `/var/lib/dongled` and `/etc/dongled/kek.cred` until you are certain you will not need the data.
 Deleting the key makes every backup unreadable.
+
+---
+
+## 10. Developing on Windows or macOS
+
+Everything above is the production install and stays Linux-only: nftables, netlink, network
+namespaces, sysfs and systemd units do not exist anywhere else. But `dongled` is code, and a
+contributor should not need a farm host, or even a Linux box, to build it, run `go test ./...`, or
+poke at the panel API. Windows and macOS are supported **development** hosts; they are not, and will
+not become, a target for the farm or panel roles above.
+
+`go build ./...`, `go vet ./...` and `go test ./...` are clean for `GOOS=windows` and `GOOS=darwin` as
+well as `GOOS=linux`; `make check` cross-builds and cross-vets all three so a regression fails the
+build rather than showing up as a surprise on someone's laptop. See `CONVENTIONS.md` §8 for how the
+platform split in the code is organised.
+
+### 10.1 Running the daemon against the simulated farm
+
+`dongled serve` runs on a non-Linux host against a simulated dongle farm — a fake network-config
+backend and an in-process device backend that behaves like a small rack of dongles without any real
+hardware. Set:
+
+- `DONGLED_PUBLIC_HOST` — the address the node treats as its own public IP. For local development this
+  does not need to be real or reachable; any address works.
+- `DONGLED_ETC_DIR` — the directory this instance uses for the state production keeps under
+  `/etc/dongled` and `/var/lib/dongled`. Point it at a scratch directory you can write to; Windows and
+  macOS have no `/etc`.
+- `DONGLED_DB` — path to the SQLite database file.
+- `DONGLED_PANEL_ADDR` / `DONGLED_METRICS_ADDR` — loopback `host:port` pairs for the panel and the
+  metrics server.
+- `DONGLED_NETCFG=fake` and `DONGLED_DEVICE=sim` — select the fake network-configuration backend and
+  the simulated dongle farm instead of the Linux-only implementations.
+- `DONGLED_SIM_SLOTS` — how many simulated dongles the fake farm pretends to have.
+
+Before the first `serve`, run the same key ceremony as §5.5, minus `sudo`:
+
+```
+dongled bootstrap-kek
+```
+
+It writes the key file inside `DONGLED_ETC_DIR` the same way it writes `/etc/dongled/kek.cred` in
+production. Re-running it overwrites the key and makes anything already encrypted with the old one
+unreadable, same as on the farm.
+
+Then `dongled serve` with the variables above starts the panel and the reconcile loop against the
+simulated farm; the health endpoint answers `200` once it is up.
+
+### 10.2 What refuses, and how
+
+Anything that needs a real Linux kernel facility — nftables (`--fw=nft`), netlink or networkd
+(`--netcfg=linux`), systemd units (`--proxy=systemd`), sysfs or real USB enumeration
+(`--device=hilink`, `dongled enroll`, most `dongled probe` experiments) — returns a plain
+"unsupported on this platform" error on Windows and macOS instead of silently no-oping or pretending
+to succeed. There is no fake systemd or fake nftables standing in for the real thing; the fake backends
+that do exist (`netcfg=fake`, `device=sim`) are there to develop against, not to simulate the
+production stack end to end. The netns integration suite (`make test-netns`) is Linux-only for the
+same reason: it needs real network namespaces and root.
