@@ -110,7 +110,7 @@ func byName(r Report, name string) Check {
 }
 
 func TestPreflightIsGreenOnAFullyPreparedHost(t *testing.T) {
-	if runtime.GOOS != "linux" {
+	if runtime.GOOS == "windows" {
 		t.Skip("the executable bit checkBinary reads does not exist in a windows os.FileMode")
 	}
 	r := Preflight(context.Background(), greenOptions(t))
@@ -126,7 +126,7 @@ func TestPreflightIsGreenOnAFullyPreparedHost(t *testing.T) {
 }
 
 func TestPreflightTurnsRedOnExactlyTheBrokenItem(t *testing.T) {
-	if runtime.GOOS != "linux" {
+	if runtime.GOOS == "windows" {
 		t.Skip("the executable bit checkBinary reads does not exist in a windows os.FileMode")
 	}
 	cases := []struct {
