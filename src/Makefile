@@ -1,4 +1,4 @@
-SHELL := /bin/bash
+SHELL := bash
 GO ?= go
 NPM ?= npm
 
