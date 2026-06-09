@@ -8,7 +8,6 @@ import type {
   Dongle,
   DongleDetail,
   Op,
-  OperationQuery,
   Proxy,
   ProxyDetail,
   ProxyPolicy,
@@ -28,7 +27,6 @@ type Health = components['schemas']['Health']
 type LinkTokenCreated = components['schemas']['LinkTokenCreated']
 type NetMode = components['schemas']['NetMode']
 type OperationAccepted = components['schemas']['OperationAccepted']
-type OperationList = components['schemas']['OperationList']
 type ProxyList = components['schemas']['ProxyList']
 type RotationList = components['schemas']['RotationList']
 type Session = components['schemas']['Session']
@@ -221,13 +219,6 @@ export function useSms(id: string | null, q: SmsQuery = {}): UseQueryResult<SmsL
   })
 }
 
-export function useOperations(q: OperationQuery = {}): UseQueryResult<OperationList, ApiFailure> {
-  return useQuery<OperationList, ApiFailure>({
-    queryKey: qk.operations(q),
-    queryFn: ({ signal }) => apiJson<OperationList>('GET', url.operations(), { query: { ...q }, signal }),
-  })
-}
-
 export function useOperation(id: string | null): UseQueryResult<Op, ApiFailure> {
   return useQuery<Op, ApiFailure>({
     queryKey: qk.operation(id ?? ''),
@@ -335,22 +326,6 @@ export function useSetProxyPorts(): UseMutationResult<
   const qc = useQueryClient()
   return useMutation<OpStart, ApiFailure, { proxyId: string; policy: ProxyPolicy }>({
     mutationFn: ({ proxyId, policy }) => startOp(url.proxyPorts(proxyId), policy),
-    onSuccess: (_r, v) => {
-      void qc.invalidateQueries({ queryKey: qk.proxy(v.proxyId) })
-      void qc.invalidateQueries({ queryKey: ['proxies'] })
-    },
-  })
-}
-
-export function useSetProxyEnabled(): UseMutationResult<
-  Proxy,
-  ApiFailure,
-  { proxyId: string; enabled: boolean }
-> {
-  const qc = useQueryClient()
-  return useMutation<Proxy, ApiFailure, { proxyId: string; enabled: boolean }>({
-    mutationFn: ({ proxyId, enabled }) =>
-      apiJson<Proxy>('POST', url.proxyEnable(proxyId), { body: { enabled } }),
     onSuccess: (_r, v) => {
       void qc.invalidateQueries({ queryKey: qk.proxy(v.proxyId) })
       void qc.invalidateQueries({ queryKey: ['proxies'] })

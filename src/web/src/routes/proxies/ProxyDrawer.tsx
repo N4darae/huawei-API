@@ -1,11 +1,44 @@
 import { Badge, CopyField, Drawer, Notice } from '../../design'
-import { useNow, useProxy } from '../../api/query'
+import { useNow, useProxy, useRotations } from '../../api/query'
 import { AuthEditor } from './AuthEditor'
 import { PortEditor } from './PortEditor'
 import { RotatePanel } from './RotatePanel'
 import { SelftestPanel } from './SelftestPanel'
 import { proxyUri } from './export'
-import { AUTH_MODE_LABEL, PROXY_STATE_TONE, formatBytes, formatClock, formatExpiry, usesIPList } from './format'
+import {
+  AUTH_MODE_LABEL,
+  PROXY_STATE_TONE,
+  formatBytes,
+  formatClock,
+  formatDurationMs,
+  formatExpiry,
+  usesIPList,
+} from './format'
+
+function RotationHistory({ proxyId }: { proxyId: string }) {
+  const history = useRotations(proxyId)
+  const items = history.data?.items ?? []
+  if (items.length === 0) return null
+  return (
+    <section className="card">
+      <h3 className="card-title">Rotation history</h3>
+      <ul className="list">
+        {items.slice(0, 5).map((r) => (
+          <li key={r.id} className="list-item" style={{ cursor: 'default' }}>
+            <div className="row">
+              <Badge tone={r.result === 'changed' ? 'ok' : 'danger'}>{r.result}</Badge>
+              <span className="mono grow">
+                {r.old_public_ip ?? '?'} → {r.new_public_ip ?? '?'}
+              </span>
+              <span className="faint">{formatDurationMs(r.duration_ms)}</span>
+              <span className="faint">{formatClock(r.requested_at)}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
 
 export interface ProxyDrawerProps {
   proxyId: string | null
@@ -80,26 +113,7 @@ export function ProxyDrawer({ proxyId, autoRotate = false, onClose }: ProxyDrawe
 
           <RotatePanel proxy={proxy} autoStart={autoRotate} />
 
-          {detail.data?.last_rotation ? (
-            <section className="card">
-              <h3 className="card-title">Last rotation</h3>
-              <dl className="kv">
-                <dt>Result</dt>
-                <dd>
-                  <Badge tone={detail.data.last_rotation.result === 'changed' ? 'ok' : 'danger'}>
-                    {detail.data.last_rotation.result}
-                  </Badge>
-                </dd>
-                <dt>Address</dt>
-                <dd className="mono">
-                  {detail.data.last_rotation.old_public_ip ?? '?'} →{' '}
-                  {detail.data.last_rotation.new_public_ip ?? '?'}
-                </dd>
-                <dt>Requested</dt>
-                <dd>{formatClock(detail.data.last_rotation.requested_at)}</dd>
-              </dl>
-            </section>
-          ) : null}
+          <RotationHistory proxyId={proxy.id} />
 
           <AuthEditor proxy={proxy} />
           <PortEditor proxy={proxy} />
