@@ -183,8 +183,10 @@ Regenerate with `make gen`. `make check` fails if the committed output is stale.
 make build          go build into bin/dongled
 make test           go test ./...
 make lint           gofmt, go vet, and the forbidden-pattern greps
+make cross-build    go build for linux, windows and darwin
+make cross-vet      go vet for linux, windows and darwin
 make gen            regenerate schema.d.ts and events.ts
-make check          lint + gen + test + fail on stale generated files
+make check          lint + gen + test + cross-build/cross-vet linux, windows, darwin + fail on stale generated files
 make web-install    npm install in web/
 make web            build the SPA into internal/webui/dist
 make web-reset      drop built assets and restore the committed dist placeholder
