@@ -94,3 +94,17 @@ func TestUnixBaseDirsMatchTheProductionLayout(t *testing.T) {
 		}
 	}
 }
+
+func TestLinuxOnlyHostNetPathsMatchTheProductionLayout(t *testing.T) {
+	want := map[string]string{
+		"NetworkDir":   "/etc/systemd/network",
+		"RtTablesDir":  "/etc/iproute2/rt_tables.d",
+		"RtTablesFile": "/etc/iproute2/rt_tables.d/" + Product + ".conf",
+	}
+	got := evalVarFile(t, "hostnet_linux.go")
+	for name, want := range want {
+		if got[name] != want {
+			t.Errorf("%s = %q, want %q", name, got[name], want)
+		}
+	}
+}
