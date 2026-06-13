@@ -48,11 +48,18 @@ func (t *trace) indexOf(s string) int {
 
 type stubNetcfg struct {
 	tr      *trace
+	mu      sync.Mutex
 	obs     netcfg.Observation
 	applyFn func(domain.Slot, string, string) error
 	events  chan netcfg.LinkEvent
 	applied []domain.Slot
 	removed []domain.Slot
+}
+
+func (m *stubNetcfg) setObs(o netcfg.Observation) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.obs = o
 }
 
 func (m *stubNetcfg) EnsureGlobal(context.Context, []netip.Addr) error { return nil }
@@ -76,7 +83,11 @@ func (m *stubNetcfg) RemoveSlot(_ context.Context, s domain.Slot) error {
 	return nil
 }
 
-func (m *stubNetcfg) Observe(context.Context) (netcfg.Observation, error) { return m.obs, nil }
+func (m *stubNetcfg) Observe(context.Context) (netcfg.Observation, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.obs, nil
+}
 
 func (m *stubNetcfg) AssertInvariants(context.Context) []netcfg.Violation { return nil }
 
@@ -448,7 +459,7 @@ func TestEnrollProvisionsASlotEndToEnd(t *testing.T) {
 
 func TestEnrollRefusesTwoFactoryDefaultDongles(t *testing.T) {
 	h := newHarness(t)
-	h.nc.obs = factoryObservation("usb0", "usb1")
+	h.nc.setObs(factoryObservation("usb0", "usb1"))
 
 	_, err := h.enroll(1)
 	if !errors.Is(err, ErrDuplicateAddr) {
@@ -463,7 +474,7 @@ func TestEnrollRefusesADuplicateAddress(t *testing.T) {
 	h := newHarness(t)
 	obs := factoryObservation("usb0")
 	obs.DuplicateAddrs = []netip.Prefix{netip.MustParsePrefix("192.168.103.1/24")}
-	h.nc.obs = obs
+	h.nc.setObs(obs)
 
 	_, err := h.enroll(1)
 	if !errors.Is(err, ErrAddressConflict) {
@@ -757,7 +768,7 @@ func TestEnrollAllocatesTheLowestFreeSlot(t *testing.T) {
 	h2.repos = h.repos
 	h2.deps.Repos = h.repos
 	h2.reg.factory.info.IMEI = "867857039999999"
-	h2.nc.obs = factoryObservation("usb1")
+	h2.nc.setObs(factoryObservation("usb1"))
 	res, err := h2.enroll(0)
 	if err != nil {
 		t.Fatalf("Enroll: %v", err)
@@ -788,7 +799,7 @@ func TestEnrollFailsWhenUdevadmHasNoIDPath(t *testing.T) {
 
 func TestEnrollAwaitsANewLinkWhenNothingIsPluggedIn(t *testing.T) {
 	h := newHarness(t)
-	h.nc.obs = factoryObservation()
+	h.nc.setObs(factoryObservation())
 	h.nc.events = make(chan netcfg.LinkEvent, 1)
 	h.deps.LinkWait = 2 * time.Second
 
@@ -798,7 +809,7 @@ func TestEnrollAwaitsANewLinkWhenNothingIsPluggedIn(t *testing.T) {
 	}
 	go func() {
 		time.Sleep(20 * time.Millisecond)
-		h.nc.obs = factoryObservation("usb0")
+		h.nc.setObs(factoryObservation("usb0"))
 		h.nc.events <- netcfg.LinkEvent{Kind: netcfg.LinkAdded, Link: netcfg.LinkState{Name: "usb0"}}
 	}()
 	res, err := e.Enroll(context.Background(), Request{Slot: 1})
@@ -812,7 +823,7 @@ func TestEnrollAwaitsANewLinkWhenNothingIsPluggedIn(t *testing.T) {
 
 func TestEnrollTimesOutWaitingForALink(t *testing.T) {
 	h := newHarness(t)
-	h.nc.obs = factoryObservation()
+	h.nc.setObs(factoryObservation())
 	h.nc.events = make(chan netcfg.LinkEvent)
 	h.deps.LinkWait = 30 * time.Millisecond
 
@@ -836,7 +847,7 @@ func TestUSBGuardDisablesEveryOtherUnprovisionedPortForTheSession(t *testing.T) 
 			return []byte("ID_PATH=pci-0000:00:14.0-usb-0:13.1:1.0\n"), nil
 		},
 	})
-	h.nc.obs = factoryObservation("usb0")
+	h.nc.setObs(factoryObservation("usb0"))
 
 	port := func(n int) string {
 		return filepath.Join(root, usbDevicesRel, "1-13:1.0", fmt.Sprintf("1-13-port%d", n), "disable")
