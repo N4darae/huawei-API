@@ -108,3 +108,28 @@ func TestLinuxOnlyHostNetPathsMatchTheProductionLayout(t *testing.T) {
 		}
 	}
 }
+
+func TestDerivedPathsFollowTheirBaseDirs(t *testing.T) {
+	if ProxyConfDir != EtcDir+"/proxy" {
+		t.Errorf("ProxyConfDir = %q, want %q", ProxyConfDir, EtcDir+"/proxy")
+	}
+	if DBPath != StateDir+"/"+Product+".db" {
+		t.Errorf("DBPath = %q, want %q", DBPath, StateDir+"/"+Product+".db")
+	}
+	if Bin3proxy != BinDir+"/3proxy" {
+		t.Errorf("Bin3proxy = %q, want %q", Bin3proxy, BinDir+"/3proxy")
+	}
+	if FarmMarker != EtcDir+"/FARM" {
+		t.Errorf("FarmMarker = %q, want %q", FarmMarker, EtcDir+"/FARM")
+	}
+	if KEKCredFile != EtcDir+"/kek.cred" {
+		t.Errorf("KEKCredFile = %q, want %q", KEKCredFile, EtcDir+"/kek.cred")
+	}
+	user := "px01"
+	if got, want := ProxyConfigPath(user), ProxyConfDir+"/"+user+".cfg"; got != want {
+		t.Errorf("ProxyConfigPath(%q) = %q, want %q", user, got, want)
+	}
+	if got, want := ProxyLogPath(user), LogDir+"/"+user+".log"; got != want {
+		t.Errorf("ProxyLogPath(%q) = %q, want %q", user, got, want)
+	}
+}
