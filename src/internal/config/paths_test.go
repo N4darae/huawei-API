@@ -4,7 +4,10 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
+	"runtime"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -131,5 +134,40 @@ func TestDerivedPathsFollowTheirBaseDirs(t *testing.T) {
 	}
 	if got, want := ProxyLogPath(user), LogDir+"/"+user+".log"; got != want {
 		t.Errorf("ProxyLogPath(%q) = %q, want %q", user, got, want)
+	}
+}
+
+func TestWindowsBaseDirsUseProgramData(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("this assertion only applies to the windows layout")
+	}
+	base := os.Getenv("ProgramData")
+	if base == "" {
+		base = "C:/ProgramData"
+	}
+	base = strings.ReplaceAll(base, "\\", "/") + "/" + Product
+	want := map[string]string{
+		"EtcDir":    base + "/etc",
+		"RunDir":    base + "/run",
+		"StateDir":  base + "/state",
+		"LogDir":    base + "/log",
+		"BackupDir": base + "/backup",
+		"BinDir":    base + "/lib",
+	}
+	got := map[string]string{
+		"EtcDir":    EtcDir,
+		"RunDir":    RunDir,
+		"StateDir":  StateDir,
+		"LogDir":    LogDir,
+		"BackupDir": BackupDir,
+		"BinDir":    BinDir,
+	}
+	for name, want := range want {
+		if got[name] != want {
+			t.Errorf("%s = %q, want %q", name, got[name], want)
+		}
+	}
+	if NetworkDir != "" || RtTablesDir != "" || RtTablesFile != "" {
+		t.Errorf("linux-only paths must stay empty on windows: NetworkDir=%q RtTablesDir=%q RtTablesFile=%q", NetworkDir, RtTablesDir, RtTablesFile)
 	}
 }
