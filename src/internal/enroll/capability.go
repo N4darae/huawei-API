@@ -215,7 +215,7 @@ const secretsBackupMaxAge = 7 * 24 * time.Hour
 
 func Preflight(ctx context.Context, o PreflightOptions) Report {
 	o.defaults()
-	return Report{
+	r := Report{
 		checkBinary(o),
 		checkConntrack(o),
 		checkModemManager(ctx, o),
@@ -231,6 +231,10 @@ func Preflight(ctx context.Context, o PreflightOptions) Report {
 		checkKernel(o),
 		checkBackup(o),
 	}
+	for i := range r {
+		r[i].Detail = strings.Join(strings.Fields(r[i].Detail), " ")
+	}
+	return r
 }
 
 func PinPath(binDir string) string { return filepath.Join(binDir, PinFileName) }
