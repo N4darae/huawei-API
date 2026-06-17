@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/netip"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -65,6 +66,9 @@ func (c *enrollCmd) flags(fs *flag.FlagSet) {
 }
 
 func (c *enrollCmd) run(ctx context.Context, cfg config.Config, args []string) error {
+	if runtime.GOOS != "linux" {
+		return domain.UnsupportedOn("enroll")
+	}
 	if err := rejectArgs("enroll", args); err != nil {
 		return err
 	}
