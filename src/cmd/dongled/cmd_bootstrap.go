@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/n4darae/huawei-API/src/internal/config"
@@ -60,8 +61,13 @@ func (c *bootstrapCmd) run(_ context.Context, cfg config.Config, args []string) 
 	if err := rejectArgs("bootstrap", args); err != nil {
 		return err
 	}
-	if c.apply && c.root == "" && !c.force {
-		return errors.New("bootstrap: --apply without --root writes into /etc, /usr and /var of this machine. Pass --root DIR to rehearse it first, or --force if this really is the farm host")
+	if c.apply {
+		if runtime.GOOS != "linux" {
+			return domain.UnsupportedOn("bootstrap --apply")
+		}
+		if c.root == "" && !c.force {
+			return errors.New("bootstrap: --apply without --root writes into /etc, /usr and /var of this machine. Pass --root DIR to rehearse it first, or --force if this really is the farm host")
+		}
 	}
 
 	plan, err := buildPlan(cfg, c.root, c.source)
