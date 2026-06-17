@@ -120,17 +120,21 @@ func buildPlan(cfg config.Config, root, source string) ([]action, error) {
 		{config.RtTablesDir, 0o755},
 		{cfg.NetworkDir, 0o755},
 	} {
+		if d.path == "" {
+			continue
+		}
 		plan = append(plan, action{Path: at(d.path), What: "directory", Mode: d.mode.String(), dir: true, mode: d.mode})
 	}
 
-	rtFile := at(config.RtTablesFile)
-	plan = append(plan, action{
-		Path: rtFile,
-		What: "route table names for all " + fmt.Sprint(domain.MaxSlots) + " slots",
-		Mode: "0644",
-		body: files.RenderRouteTables(domain.Slots()),
-		mode: 0o644,
-	})
+	if config.RtTablesFile != "" {
+		plan = append(plan, action{
+			Path: at(config.RtTablesFile),
+			What: "route table names for all " + fmt.Sprint(domain.MaxSlots) + " slots",
+			Mode: "0644",
+			body: files.RenderRouteTables(domain.Slots()),
+			mode: 0o644,
+		})
+	}
 
 	plan = append(plan, action{
 		Path: at("/etc/systemd/system/" + config.UnitProxyTpl),
