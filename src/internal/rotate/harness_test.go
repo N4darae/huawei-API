@@ -528,8 +528,32 @@ func (s *eventSink) Events() []eventbus.Event {
 	return append([]eventbus.Event(nil), s.events...)
 }
 
+func (s *eventSink) waitUntil(t *testing.T, want func([]eventbus.Event) bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if want(s.Events()) {
+			return
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	t.Fatal("the event bus never carried what the test was waiting for")
+}
+
 func (h *harness) steps(subject string) []string {
 	h.t.Helper()
+	h.sink.waitUntil(h.t, func(evs []eventbus.Event) bool {
+		for _, e := range evs {
+			if e.Type != eventbus.EvOpDone {
+				continue
+			}
+			var p opPayload
+			if err := json.Unmarshal(e.Data, &p); err == nil && p.SubjectID == subject {
+				return true
+			}
+		}
+		return false
+	})
 	out := []string{}
 	for _, e := range h.sink.Events() {
 		if e.Type != eventbus.EvOpUpdate && e.Type != eventbus.EvOpDone {
