@@ -279,7 +279,11 @@ func loadSealer(cfg config.Config) (secrets.Sealer, error) {
 			return sealer, nil
 		}
 	}
-	return secrets.LoadKEK(kekPath(cfg))
+	sealer, err := secrets.LoadKEK(kekPath(cfg))
+	if errors.Is(err, secrets.ErrKEKMissing) {
+		return nil, fmt.Errorf("%w. On a fresh host run `%s bootstrap-kek`; on an existing one restore the copy you took off the machine, because nothing else can decrypt the stored passwords", err, config.Product)
+	}
+	return sealer, err
 }
 
 func kekPath(cfg config.Config) string {
