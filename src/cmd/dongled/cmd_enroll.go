@@ -236,6 +236,9 @@ func requireFarmHost(force bool) error {
 func buildNetcfg(cfg config.Config) (netcfg.Manager, error) {
 	switch cfg.Netcfg {
 	case config.BackendLinux:
+		if runtime.GOOS != "linux" {
+			return nil, domain.UnsupportedOn("linux netcfg backend")
+		}
 		return netcfglinux.New(netcfglinux.Options{
 			NetworkDir:    cfg.NetworkDir,
 			Exec:          netcfg.SystemExec,
