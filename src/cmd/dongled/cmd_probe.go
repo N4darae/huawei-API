@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -104,6 +105,9 @@ type probeReport struct {
 }
 
 func (c *probeCmd) run(ctx context.Context, cfg config.Config, args []string) error {
+	if runtime.GOOS != "linux" {
+		return domain.UnsupportedOn("probe")
+	}
 	if err := rejectArgs("probe", args); err != nil {
 		return err
 	}
