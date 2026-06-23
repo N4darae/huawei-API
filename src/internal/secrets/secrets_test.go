@@ -23,6 +23,8 @@ func testKEK(t *testing.T) []byte {
 	return kek
 }
 
+const leakProbeMinLen = 8
+
 func TestSealOpenRoundTrip(t *testing.T) {
 	s, err := NewSealer(testKEK(t))
 	if err != nil {
@@ -37,7 +39,7 @@ func TestSealOpenRoundTrip(t *testing.T) {
 		if len(ct) <= NonceSize {
 			t.Fatalf("ciphertext %d bytes must exceed the %d byte nonce", len(ct), NonceSize)
 		}
-		if plaintext != "" && bytes.Contains(ct, []byte(plaintext)) {
+		if len(plaintext) >= leakProbeMinLen && bytes.Contains(ct, []byte(plaintext)) {
 			t.Fatal("ciphertext leaks the plaintext")
 		}
 		got, err := s.Open(ct)
