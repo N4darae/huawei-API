@@ -1,0 +1,39 @@
+# Keep ModemManager and NetworkManager away from the dongles.
+# Install to /etc/udev/rules.d/99-dongled-mm-ignore.rules, then:
+#
+#   udevadm control --reload-rules
+#   udevadm trigger --subsystem-match=usb --subsystem-match=net
+#
+# ModemManager probes every new USB modem it sees, claims the netdev, and tries
+# to dial it itself. On a HiLink stick that means it fights systemd-networkd for
+# the interface, occasionally power-cycles the modem mid-rotation, and makes
+# `carrier` flap. There is no error anywhere in our logs when this happens; the
+# dongle just behaves erratically.
+#
+# The clean fix is `systemctl disable --now ModemManager`, and that is what the
+# install guide recommends on a dedicated farm host. This file is the fallback
+# for a host where ModemManager has to stay for some other device.
+#
+# 12d1 is Huawei. 1f01/14dc/14db/155e are the E3372 HiLink product ids across
+# the -320 and -325 SKUs and the mass-storage / "switch me" mode they enumerate
+# in before switching.
+
+ACTION!="add|change|bind", GOTO="dongled_mm_end"
+
+SUBSYSTEM=="usb", ATTR{idVendor}=="12d1", ENV{ID_MM_DEVICE_IGNORE}="1"
+SUBSYSTEM=="usb", ATTR{idVendor}=="12d1", ENV{ID_MM_PORT_IGNORE}="1"
+SUBSYSTEM=="usb", ATTR{idVendor}=="12d1", ENV{ID_MM_CANDIDATE}="0"
+
+SUBSYSTEM=="tty", ATTRS{idVendor}=="12d1", ENV{ID_MM_DEVICE_IGNORE}="1"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="12d1", ENV{ID_MM_PORT_IGNORE}="1"
+
+# NetworkManager must not try to autoconfigure the dongle netdev either;
+# systemd-networkd owns it through the generated dgNN.network file.
+SUBSYSTEM=="net", ATTRS{idVendor}=="12d1", ENV{NM_UNMANAGED}="1"
+SUBSYSTEM=="net", ATTRS{idVendor}=="12d1", ENV{ID_MM_DEVICE_IGNORE}="1"
+
+# Every dongle netdev is readable by the dongled group so the panel can read
+# carrier/operstate without root.
+SUBSYSTEM=="net", ATTRS{idVendor}=="12d1", ENV{ID_NET_DRIVER}=="cdc_ether|rndis_host|cdc_ncm|huawei_cdc_ncm", TAG+="systemd"
+
+LABEL="dongled_mm_end"

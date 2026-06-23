@@ -1,0 +1,35 @@
+[Unit]
+Description=dongled 3proxy instance %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=%i
+Group=dongled
+ExecStart=/usr/local/lib/dongled/3proxy /etc/dongled/proxy/%i.cfg
+ExecReload=/bin/kill -USR1 $MAINPID
+Restart=on-failure
+RestartSec=2s
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=10s
+LimitNOFILE=65536
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+ReadWritePaths=/var/log/dongled
+ReadOnlyPaths=/etc/dongled/proxy
+
+[Install]
+WantedBy=multi-user.target
