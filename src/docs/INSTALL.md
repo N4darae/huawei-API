@@ -366,11 +366,12 @@ dongled bootstrap-kek
 ```
 
 It writes the key file inside `DONGLED_ETC_DIR` the same way it writes `/etc/dongled/kek.cred` in
-production. Re-running it overwrites the key and makes anything already encrypted with the old one
-unreadable, same as on the farm.
+production. Re-running it against an existing key refuses rather than overwriting, because a new key
+makes every password already encrypted with the old one permanently unreadable; `--force` overrides
+that, and on a scratch directory that is usually what you want.
 
 Then `dongled serve` with the variables above starts the panel and the reconcile loop against the
-simulated farm; the health endpoint answers `200` once it is up.
+simulated farm. `GET /api/v1/healthz` answers `200` once it is up.
 
 ### 10.2 What refuses, and how
 
