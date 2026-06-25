@@ -363,6 +363,9 @@ func deployFile(t *testing.T, rel string) string {
 }
 
 func TestDeployedProxyUnitIsExactlyWhatTheSupervisorRenders(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the deploy unit hardcodes the unix 3proxy and log paths")
+	}
 	want := proxysup.RenderUnit(proxysup.UnitOptions{})
 	got := deployFile(t, "dongled-proxy@.service")
 	if !bytes.Equal([]byte(got), want) {
