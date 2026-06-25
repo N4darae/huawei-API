@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -50,11 +51,20 @@ func golden(t *testing.T, name string, got []byte) {
 	}
 }
 
+func skipGoldenOnWindows(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("golden fixtures hardcode the unix log path")
+	}
+}
+
 func TestRenderGoldenUserPass(t *testing.T) {
+	skipGoldenOnWindows(t)
 	golden(t, "px01_userpass.cfg", mustRender(t, testSpec(t)))
 }
 
 func TestRenderGoldenIPList(t *testing.T) {
+	skipGoldenOnWindows(t)
 	sp := testSpec(t)
 	sp.AuthMode = domain.AuthIPList
 	sp.Users = nil
@@ -66,6 +76,7 @@ func TestRenderGoldenIPList(t *testing.T) {
 }
 
 func TestRenderGoldenBoth(t *testing.T) {
+	skipGoldenOnWindows(t)
 	sp := testSpec(t)
 	sp.AuthMode = domain.AuthBoth
 	sp.AuthIPs = []netip.Prefix{netip.MustParsePrefix("203.0.113.5/32")}
@@ -73,6 +84,7 @@ func TestRenderGoldenBoth(t *testing.T) {
 }
 
 func TestRenderGoldenNarrowedPorts(t *testing.T) {
+	skipGoldenOnWindows(t)
 	sp := testSpec(t)
 	sp.Policy.AllowAllPorts = false
 	sp.Policy.AllowedPorts = []domain.PortRange{{Lo: 80, Hi: 80}, {Lo: 443, Hi: 443}, {Lo: 8000, Hi: 8100}}
