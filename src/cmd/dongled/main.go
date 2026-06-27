@@ -17,6 +17,7 @@ import (
 type Command struct {
 	Name  string
 	Usage string
+	Flags func(fs *flag.FlagSet)
 	Run   func(ctx context.Context, cfg config.Config, args []string) error
 }
 
@@ -63,6 +64,9 @@ func run(ctx context.Context, argv []string) error {
 
 	fs := flag.NewFlagSet(config.Product+" "+name, flag.ContinueOnError)
 	cfg.BindFlags(fs)
+	if cmd.Flags != nil {
+		cmd.Flags(fs)
+	}
 	if err := fs.Parse(argv[1:]); err != nil {
 		return err
 	}
