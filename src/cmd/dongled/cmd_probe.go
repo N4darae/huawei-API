@@ -37,12 +37,38 @@ func A3Ladder() []time.Duration {
 	return []time.Duration{2 * time.Second, 6 * time.Second, 15 * time.Second, 40 * time.Second}
 }
 
+type probeCmd struct {
+	experiment string
+	slot       int
+	addr       string
+	iface      string
+	rounds     int
+	sysfs      string
+	out        string
+	jsonOut    string
+	asJSON     bool
+}
+
 func init() {
+	c := &probeCmd{}
 	Register(Command{
 		Name:  "probe",
-		Usage: "run a hardware measurement (dongled probe -- --experiment a2|a3|a4|a6|login)",
-		Run:   runProbe,
+		Usage: "run a hardware measurement (--experiment a2|a3|a4|a6|login)",
+		Flags: c.flags,
+		Run:   c.run,
 	})
+}
+
+func (c *probeCmd) flags(fs *flag.FlagSet) {
+	fs.StringVar(&c.experiment, "experiment", "", "a2|a3|a4|a6|login")
+	fs.IntVar(&c.slot, "slot", 0, "talk to the dongle enrolled in this slot")
+	fs.StringVar(&c.addr, "addr", "", "talk to the dongle at this address, defaults to "+device.FactoryDefaultAddr.String())
+	fs.StringVar(&c.iface, "iface", "", "netdev to sample, defaults to the slot interface")
+	fs.IntVar(&c.rounds, "rounds", A3DefaultRounds, "rotations per hold step for a3")
+	fs.StringVar(&c.sysfs, "sysfs", enroll.DefaultSysfsRoot, "sysfs root")
+	fs.StringVar(&c.out, "out", "", "append a markdown section to this file, typically docs/OPERATIONS.md")
+	fs.StringVar(&c.jsonOut, "json-out", "", "write the machine readable result to this file")
+	fs.BoolVar(&c.asJSON, "json", false, "print json instead of markdown")
 }
 
 type fact struct {
@@ -77,29 +103,16 @@ type probeReport struct {
 	Samples    []map[string]any `json:"samples,omitempty"`
 }
 
-func runProbe(ctx context.Context, cfg config.Config, args []string) error {
-	fs := flag.NewFlagSet(config.Product+" probe", flag.ContinueOnError)
-	experiment := fs.String("experiment", "", "a2|a3|a4|a6|login")
-	slot := fs.Int("slot", 0, "talk to the dongle enrolled in this slot")
-	addr := fs.String("addr", "", "talk to the dongle at this address, defaults to "+device.FactoryDefaultAddr.String())
-	iface := fs.String("iface", "", "netdev to sample, defaults to the slot interface")
-	rounds := fs.Int("rounds", A3DefaultRounds, "rotations per hold step for a3")
-	sysfs := fs.String("sysfs", enroll.DefaultSysfsRoot, "sysfs root")
-	out := fs.String("out", "", "append a markdown section to this file, typically docs/OPERATIONS.md")
-	jsonOut := fs.String("json-out", "", "write the machine readable result to this file")
-	asJSON := fs.Bool("json", false, "print json instead of markdown")
-	if err := parseSubFlags(fs, args); err != nil {
+func (c *probeCmd) run(ctx context.Context, cfg config.Config, args []string) error {
+	if err := rejectArgs("probe", args); err != nil {
 		return err
-	}
-	if rest := fs.Args(); *experiment == "" && len(rest) == 1 {
-		*experiment = rest[0]
 	}
 
 	started := time.Now()
 	kernel, _ := enroll.KernelRelease()
 	host, _ := os.Hostname()
 	rep := probeReport{
-		Experiment: strings.ToLower(*experiment),
+		Experiment: strings.ToLower(c.experiment),
 		StartedAt:  started.UTC(),
 		Host:       host,
 		Kernel:     kernel,
@@ -108,37 +121,37 @@ func runProbe(ctx context.Context, cfg config.Config, args []string) error {
 	var err error
 	switch rep.Experiment {
 	case ExperimentA6:
-		err = probeA6(ctx, cfg, *sysfs, &rep)
+		err = probeA6(ctx, cfg, c.sysfs, &rep)
 	case ExperimentA4:
-		err = probeA4(ctx, cfg, *sysfs, *iface, domain.Slot(*slot), &rep)
+		err = probeA4(ctx, cfg, c.sysfs, c.iface, domain.Slot(c.slot), &rep)
 	case ExperimentLogin:
-		err = probeLogin(ctx, cfg, *addr, domain.Slot(*slot), &rep)
+		err = probeLogin(ctx, cfg, c.addr, domain.Slot(c.slot), &rep)
 	case ExperimentA2:
-		err = probeA2(ctx, cfg, *addr, domain.Slot(*slot), *sysfs, &rep)
+		err = probeA2(ctx, cfg, c.addr, domain.Slot(c.slot), c.sysfs, &rep)
 	case ExperimentA3:
-		err = probeA3(ctx, cfg, *addr, domain.Slot(*slot), *rounds, &rep)
+		err = probeA3(ctx, cfg, c.addr, domain.Slot(c.slot), c.rounds, &rep)
 	case "":
 		return errors.New("probe: --experiment is required, one of a2, a3, a4, a6, login")
 	default:
-		return fmt.Errorf("probe: unknown experiment %q", *experiment)
+		return fmt.Errorf("probe: unknown experiment %q", c.experiment)
 	}
 	rep.DurationMS = time.Since(started).Milliseconds()
 	if err != nil {
 		rep.Verdict = "ABORTED: " + err.Error()
 	}
 
-	if *jsonOut != "" {
-		if werr := writeJSONFile(*jsonOut, rep); werr != nil {
+	if c.jsonOut != "" {
+		if werr := writeJSONFile(c.jsonOut, rep); werr != nil {
 			return werr
 		}
 	}
-	if *out != "" {
-		if werr := appendMarkdown(*out, rep); werr != nil {
+	if c.out != "" {
+		if werr := appendMarkdown(c.out, rep); werr != nil {
 			return werr
 		}
-		fmt.Fprintf(os.Stderr, "appended to %s\n", *out)
+		fmt.Fprintf(os.Stderr, "appended to %s\n", c.out)
 	}
-	if *asJSON {
+	if c.asJSON {
 		if jerr := writeJSON(rep); jerr != nil {
 			return jerr
 		}

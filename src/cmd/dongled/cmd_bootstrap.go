@@ -20,12 +20,30 @@ import (
 
 const DefaultDeploySource = "/usr/local/share/" + config.Product + "/deploy"
 
+type bootstrapCmd struct {
+	root   string
+	source string
+	apply  bool
+	force  bool
+	asJSON bool
+}
+
 func init() {
+	c := &bootstrapCmd{}
 	Register(Command{
 		Name:  "bootstrap",
 		Usage: "lay down directories, units and host config (prints a plan unless --apply)",
-		Run:   runBootstrap,
+		Flags: c.flags,
+		Run:   c.run,
 	})
+}
+
+func (c *bootstrapCmd) flags(fs *flag.FlagSet) {
+	fs.StringVar(&c.root, "root", "", "prefix every path with this directory, for testing an install in a chroot or temp dir")
+	fs.StringVar(&c.source, "source", DefaultDeploySource, "directory holding the deploy/ tree")
+	fs.BoolVar(&c.apply, "apply", false, "actually write; the default only prints the plan")
+	fs.BoolVar(&c.force, "force", false, "allow --apply against the live filesystem, needed when --root is empty")
+	fs.BoolVar(&c.asJSON, "json", false, "emit the plan as json")
 }
 
 type action struct {
@@ -38,32 +56,26 @@ type action struct {
 	dir    bool
 }
 
-func runBootstrap(_ context.Context, cfg config.Config, args []string) error {
-	fs := flag.NewFlagSet(config.Product+" bootstrap", flag.ContinueOnError)
-	root := fs.String("root", "", "prefix every path with this directory, for testing an install in a chroot or temp dir")
-	source := fs.String("source", DefaultDeploySource, "directory holding the deploy/ tree")
-	apply := fs.Bool("apply", false, "actually write; the default only prints the plan")
-	force := fs.Bool("force", false, "allow --apply against the live filesystem, needed when --root is empty")
-	asJSON := fs.Bool("json", false, "emit the plan as json")
-	if err := parseSubFlags(fs, args); err != nil {
+func (c *bootstrapCmd) run(_ context.Context, cfg config.Config, args []string) error {
+	if err := rejectArgs("bootstrap", args); err != nil {
 		return err
 	}
-	if *apply && *root == "" && !*force {
+	if c.apply && c.root == "" && !c.force {
 		return errors.New("bootstrap: --apply without --root writes into /etc, /usr and /var of this machine. Pass --root DIR to rehearse it first, or --force if this really is the farm host")
 	}
 
-	plan, err := buildPlan(cfg, *root, *source)
+	plan, err := buildPlan(cfg, c.root, c.source)
 	if err != nil {
 		return err
 	}
 
-	if !*apply {
-		if *asJSON {
+	if !c.apply {
+		if c.asJSON {
 			return writeJSON(plan)
 		}
-		fmt.Printf("plan only, nothing was written. Re-run with -- --apply to execute.\n\n")
+		fmt.Printf("plan only, nothing was written. Re-run with --apply to execute.\n\n")
 		printPlan(plan)
-		printNextSteps(*root)
+		printNextSteps(c.root)
 		return nil
 	}
 
@@ -72,11 +84,11 @@ func runBootstrap(_ context.Context, cfg config.Config, args []string) error {
 			return err
 		}
 	}
-	if *asJSON {
+	if c.asJSON {
 		return writeJSON(plan)
 	}
 	printPlan(plan)
-	printNextSteps(*root)
+	printNextSteps(c.root)
 	return nil
 }
 
@@ -232,26 +244,35 @@ the ssh connection you need to keep.
 		"/etc/sysctl.d/60-"+config.Product+".conf", config.Product, config.Product, config.UnitBackend)
 }
 
+type bootstrapKEKCmd struct {
+	path  string
+	force bool
+}
+
 func init() {
+	c := &bootstrapKEKCmd{}
 	Register(Command{
 		Name:  "bootstrap-kek",
 		Usage: "generate the key that encrypts proxy passwords at rest, once",
-		Run:   runBootstrapKEK,
+		Flags: c.flags,
+		Run:   c.run,
 	})
 }
 
-func runBootstrapKEK(_ context.Context, cfg config.Config, args []string) error {
-	fset := flag.NewFlagSet(config.Product+" bootstrap-kek", flag.ContinueOnError)
-	path := fset.String("path", "", "where the key is written, defaults to "+config.KEKCredFile)
-	force := fset.Bool("force", false, "overwrite an existing key, which makes every stored password unreadable")
-	if err := parseSubFlags(fset, args); err != nil {
+func (c *bootstrapKEKCmd) flags(fs *flag.FlagSet) {
+	fs.StringVar(&c.path, "path", "", "where the key is written, defaults to "+config.KEKCredFile)
+	fs.BoolVar(&c.force, "force", false, "overwrite an existing key, which makes every stored password unreadable")
+}
+
+func (c *bootstrapKEKCmd) run(_ context.Context, cfg config.Config, args []string) error {
+	if err := rejectArgs("bootstrap-kek", args); err != nil {
 		return err
 	}
-	target := *path
+	target := c.path
 	if target == "" {
 		target = kekPath(cfg)
 	}
-	if _, err := os.Stat(target); err == nil && !*force {
+	if _, err := os.Stat(target); err == nil && !c.force {
 		return fmt.Errorf("bootstrap-kek: %s already exists. Overwriting it makes every stored proxy password permanently unreadable; pass --force only if you have accepted that", target)
 	} else if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err

@@ -11,39 +11,54 @@ import (
 	"github.com/n4darae/huawei-API/src/internal/store"
 )
 
+type backupCmd struct {
+	dir    string
+	verify string
+	list   bool
+	asJSON bool
+}
+
 func init() {
+	c := &backupCmd{}
 	Register(Command{
 		Name:  "backup",
 		Usage: "snapshot the database and verify the snapshot",
-		Run:   runBackup,
+		Flags: c.flags,
+		Run:   c.run,
 	})
 }
 
-func runBackup(ctx context.Context, cfg config.Config, args []string) error {
-	fs := flag.NewFlagSet(config.Product+" backup", flag.ContinueOnError)
-	dir := fs.String("dir", cfg.BackupDir, "directory the snapshot is written to")
-	verify := fs.String("verify", "", "verify an existing snapshot instead of taking a new one")
-	list := fs.Bool("list", false, "report the newest snapshot and its age")
-	asJSON := fs.Bool("json", false, "emit the result as json")
-	if err := parseSubFlags(fs, args); err != nil {
+func (c *backupCmd) flags(fs *flag.FlagSet) {
+	fs.StringVar(&c.dir, "dir", config.BackupDir, "directory the snapshot is written to")
+	fs.StringVar(&c.verify, "verify", "", "verify an existing snapshot instead of taking a new one")
+	fs.BoolVar(&c.list, "list", false, "report the newest snapshot and its age")
+	fs.BoolVar(&c.asJSON, "json", false, "emit the result as json")
+}
+
+func (c *backupCmd) run(ctx context.Context, cfg config.Config, args []string) error {
+	if err := rejectArgs("backup", args); err != nil {
 		return err
 	}
+	dir := c.dir
+	if dir == config.BackupDir && cfg.BackupDir != "" {
+		dir = cfg.BackupDir
+	}
 
-	if *verify != "" {
-		if err := store.VerifyBackup(ctx, *verify); err != nil {
+	if c.verify != "" {
+		if err := store.VerifyBackup(ctx, c.verify); err != nil {
 			return err
 		}
-		fmt.Printf("%s passes an integrity check\n", *verify)
+		fmt.Printf("%s passes an integrity check\n", c.verify)
 		return nil
 	}
 
-	if *list {
-		path, at, err := enroll.NewestBackup(*dir)
+	if c.list {
+		path, at, err := enroll.NewestBackup(dir)
 		if err != nil {
 			return err
 		}
 		age := time.Since(at).Round(time.Minute)
-		if *asJSON {
+		if c.asJSON {
 			return writeJSON(map[string]any{"path": path, "taken_at": at, "age_seconds": int(age.Seconds())})
 		}
 		fmt.Printf("%s taken %s ago\n", path, age)
@@ -63,11 +78,11 @@ func runBackup(ctx context.Context, cfg config.Config, args []string) error {
 		return err
 	}
 
-	path, err := s.Backup(ctx, *dir)
+	path, err := s.Backup(ctx, dir)
 	if err != nil {
 		return err
 	}
-	if *asJSON {
+	if c.asJSON {
 		return writeJSON(map[string]any{"path": path})
 	}
 	fmt.Printf("%s written and verified\n", path)
