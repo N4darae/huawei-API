@@ -345,18 +345,22 @@ platform split in the code is organised.
 
 `dongled serve` runs on a non-Linux host against a simulated dongle farm — a fake network-config
 backend and an in-process device backend that behaves like a small rack of dongles without any real
-hardware. Set:
+hardware. Only one variable is required:
 
-- `DONGLED_PUBLIC_HOST` — the address the node treats as its own public IP. For local development this
-  does not need to be real or reachable; any address works.
+- `DONGLED_PUBLIC_HOST` — the address the node treats as its own public IP. It must be a global unicast
+  address, but for local development it does not need to be real or reachable.
+
+The fake network-config backend and the simulated farm are already the defaults, and the state
+directories default to a writable per-platform location, so nothing else has to be set. Override any
+of these when you want to:
+
 - `DONGLED_ETC_DIR` — the directory this instance uses for the state production keeps under
-  `/etc/dongled` and `/var/lib/dongled`. Point it at a scratch directory you can write to; Windows and
-  macOS have no `/etc`.
+  `/etc/dongled`. Point it at a scratch directory when you want several instances side by side.
 - `DONGLED_DB` — path to the SQLite database file.
-- `DONGLED_PANEL_ADDR` / `DONGLED_METRICS_ADDR` — loopback `host:port` pairs for the panel and the
-  metrics server.
-- `DONGLED_NETCFG=fake` and `DONGLED_DEVICE=sim` — select the fake network-configuration backend and
-  the simulated dongle farm instead of the Linux-only implementations.
+- `DONGLED_PANEL_ADDR` / `DONGLED_METRICS_ADDR` — `host:port` pairs for the panel and the metrics
+  server.
+- `DONGLED_NETCFG` / `DONGLED_DEVICE` — `fake` and `sim` by default. The Linux-only `linux` and
+  `hilink` backends refuse to start off Linux rather than half-working.
 - `DONGLED_SIM_SLOTS` — how many simulated dongles the fake farm pretends to have.
 
 Before the first `serve`, run the same key ceremony as §5.5, minus `sudo`:
