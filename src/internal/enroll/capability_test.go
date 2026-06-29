@@ -363,10 +363,11 @@ func deployFile(t *testing.T, rel string) string {
 }
 
 func TestDeployedProxyUnitIsExactlyWhatTheSupervisorRenders(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the deploy unit hardcodes the unix 3proxy and log paths")
-	}
-	want := proxysup.RenderUnit(proxysup.UnitOptions{})
+	want := proxysup.RenderUnit(proxysup.UnitOptions{
+		Bin:     "/usr/local/lib/dongled/3proxy",
+		ConfDir: "/etc/dongled/proxy",
+		LogDir:  "/var/log/dongled",
+	})
 	got := deployFile(t, "dongled-proxy@.service")
 	if !bytes.Equal([]byte(got), want) {
 		t.Fatalf("deploy/dongled-proxy@.service has drifted from proxysup.RenderUnit; regenerate it instead of hand editing\n--- on disk ---\n%s\n--- rendered ---\n%s", got, want)
