@@ -104,10 +104,15 @@ type probeReport struct {
 	Samples    []map[string]any `json:"samples,omitempty"`
 }
 
-func (c *probeCmd) run(ctx context.Context, cfg config.Config, args []string) error {
-	if runtime.GOOS != "linux" {
-		return domain.UnsupportedOn("probe")
+func experimentNeedsSysfs(exp string) bool {
+	switch exp {
+	case ExperimentA2, ExperimentA4, ExperimentA6:
+		return true
 	}
+	return false
+}
+
+func (c *probeCmd) run(ctx context.Context, cfg config.Config, args []string) error {
 	if err := rejectArgs("probe", args); err != nil {
 		return err
 	}
@@ -120,6 +125,10 @@ func (c *probeCmd) run(ctx context.Context, cfg config.Config, args []string) er
 		StartedAt:  started.UTC(),
 		Host:       host,
 		Kernel:     kernel,
+	}
+
+	if runtime.GOOS != "linux" && experimentNeedsSysfs(rep.Experiment) {
+		return domain.UnsupportedOn("probe " + rep.Experiment)
 	}
 
 	var err error
