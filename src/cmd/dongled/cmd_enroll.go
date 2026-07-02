@@ -21,52 +21,64 @@ import (
 	netcfgfake "github.com/n4darae/huawei-API/src/internal/netcfg/fake"
 	netcfglinux "github.com/n4darae/huawei-API/src/internal/netcfg/linux"
 	"github.com/n4darae/huawei-API/src/internal/proxysup"
+	"github.com/n4darae/huawei-API/src/internal/rotate"
 	"github.com/n4darae/huawei-API/src/internal/secrets"
 	"github.com/n4darae/huawei-API/src/internal/store"
 )
 
 var errNotFarmHost = errors.New("this host is not marked as a farm host")
 
+type enrollCmd struct {
+	slot          int
+	carrier       string
+	wait          time.Duration
+	rediscover    time.Duration
+	sysfs         string
+	noUSB         bool
+	skipPreflight bool
+	skipSelftest  bool
+	force         bool
+	asJSON        bool
+}
+
 func init() {
+	c := &enrollCmd{}
 	Register(Command{
 		Name:  "enroll",
-		Usage: "provision one dongle into a slot (dongled enroll -- --slot N)",
-		Run:   runEnroll,
+		Usage: "provision one dongle into a slot",
+		Flags: c.flags,
+		Run:   c.run,
 	})
 }
 
-func runEnroll(ctx context.Context, cfg config.Config, args []string) error {
-	fs := flag.NewFlagSet(config.Product+" enroll", flag.ContinueOnError)
-	slot := fs.Int("slot", 0, "slot number 1-48, 0 allocates the lowest free slot")
-	carrier := fs.String("carrier", "", "carrier name recorded on the dongle row")
-	wait := fs.Duration("wait", enroll.DefaultLinkWait, "how long to wait for the dongle to enumerate")
-	rediscover := fs.Duration("rediscover", enroll.DefaultRediscover, "how long to wait for the dongle at its new lan address")
-	sysfs := fs.String("sysfs", enroll.DefaultSysfsRoot, "sysfs root, for testing against a fixture tree")
-	noUSB := fs.Bool("no-usb-guard", false, "do not disable the usb ports of the other un-provisioned slots")
-	skipPreflight := fs.Bool("skip-preflight", false, "enrol even though the fatal preflight checks are red")
-	force := fs.Bool("force", false, "run even though "+config.FarmMarker+" is absent")
-	asJSON := fs.Bool("json", false, "emit the result as json")
-	if err := parseSubFlags(fs, args); err != nil {
+func (c *enrollCmd) flags(fs *flag.FlagSet) {
+	fs.IntVar(&c.slot, "slot", 0, "slot number 1-48, 0 allocates the lowest free slot")
+	fs.StringVar(&c.carrier, "carrier", "", "carrier name recorded on the dongle row")
+	fs.DurationVar(&c.wait, "wait", enroll.DefaultLinkWait, "how long to wait for the dongle to enumerate")
+	fs.DurationVar(&c.rediscover, "rediscover", enroll.DefaultRediscover, "how long to wait for the dongle at its new lan address")
+	fs.StringVar(&c.sysfs, "sysfs", enroll.DefaultSysfsRoot, "sysfs root, for testing against a fixture tree")
+	fs.BoolVar(&c.noUSB, "no-usb-guard", false, "do not disable the usb ports of the other un-provisioned slots")
+	fs.BoolVar(&c.skipPreflight, "skip-preflight", false, "enrol even though the fatal preflight checks are red")
+	fs.BoolVar(&c.skipSelftest, "skip-selftest", false, "do not verify the finished proxy through a real egress probe")
+	fs.BoolVar(&c.force, "force", false, "run even though "+config.FarmMarker+" is absent")
+	fs.BoolVar(&c.asJSON, "json", false, "emit the result as json")
+}
+
+func (c *enrollCmd) run(ctx context.Context, cfg config.Config, args []string) error {
+	if err := rejectArgs("enroll", args); err != nil {
 		return err
 	}
-	if rest := fs.Args(); len(rest) == 1 && *slot == 0 {
-		n, err := parsePositiveInt(rest[0])
-		if err != nil {
-			return fmt.Errorf("enroll: %q is not a slot number", rest[0])
-		}
-		*slot = n
+	if c.slot != 0 && !domain.Slot(c.slot).Valid() {
+		return fmt.Errorf("enroll: slot %d is outside 1-%d", c.slot, domain.MaxSlots)
 	}
-	if *slot != 0 && !domain.Slot(*slot).Valid() {
-		return fmt.Errorf("enroll: slot %d is outside 1-%d", *slot, domain.MaxSlots)
-	}
-	if err := requireFarmHost(*force); err != nil {
+	if err := requireFarmHost(c.force); err != nil {
 		return err
 	}
 	if !cfg.PublicHost.IsValid() {
 		return config.ErrPublicHostMissing
 	}
 
-	if !*skipPreflight {
+	if !c.skipPreflight {
 		report := enroll.Preflight(ctx, preflightOptions(cfg))
 		if !report.Green(true) {
 			fmt.Fprint(os.Stderr, report.FatalFailed().Text())
@@ -106,6 +118,12 @@ func runEnroll(ctx context.Context, cfg config.Config, args []string) error {
 		return err
 	}
 
+	selftest, closeSelftest, err := buildSelftest(cfg, repos, devices, firewall, c.skipSelftest)
+	if err != nil {
+		return err
+	}
+	defer closeSelftest(ctx)
+
 	e, err := enroll.New(enroll.Deps{
 		NodeID:          cfg.NodeID,
 		PublicHost:      cfg.PublicHost,
@@ -115,13 +133,13 @@ func runEnroll(ctx context.Context, cfg config.Config, args []string) error {
 		Devices:         devices,
 		Repos:           repos,
 		Supervisor:      supervisor,
-		USB:             enroll.NewUSBController(enroll.USBOptions{SysfsRoot: *sysfs}),
-		SkipUSBGuard:    *noUSB,
-		LinkWait:        *wait,
-		Rediscover:      *rediscover,
-		Selftest:        nil,
+		USB:             enroll.NewUSBController(enroll.USBOptions{SysfsRoot: c.sysfs}),
+		SkipUSBGuard:    c.noUSB,
+		LinkWait:        c.wait,
+		Rediscover:      c.rediscover,
+		Selftest:        selftest,
 		Progress: func(ev enroll.Event) {
-			if *asJSON {
+			if c.asJSON {
 				return
 			}
 			if ev.Error != "" {
@@ -135,15 +153,47 @@ func runEnroll(ctx context.Context, cfg config.Config, args []string) error {
 		return err
 	}
 
-	res, err := e.Enroll(ctx, enroll.Request{Slot: domain.Slot(*slot), Carrier: *carrier})
+	res, err := e.Enroll(ctx, enroll.Request{Slot: domain.Slot(c.slot), Carrier: c.carrier})
 	if err != nil {
 		return err
 	}
-	if *asJSON {
+	if c.asJSON {
 		return writeJSON(res)
 	}
 	printEnrollSummary(cfg, res)
 	return nil
+}
+
+func buildSelftest(cfg config.Config, repos store.Repos, devices device.Registry, firewall fw.Firewall, skip bool) (enroll.Selftest, func(context.Context), error) {
+	if skip {
+		return nil, func(context.Context) {}, nil
+	}
+	prober, err := rotate.NewProber(rotate.ProberOptions{Timeout: cfg.Carrier.VerifyTimeout})
+	if err != nil {
+		return nil, nil, err
+	}
+	engine, err := rotate.New(rotate.Deps{
+		Repos:  repos,
+		Dev:    devices,
+		FW:     firewall,
+		Probe:  prober,
+		NodeID: cfg.NodeID,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	selftest := func(ctx context.Context, proxyID string) error {
+		r, err := engine.Selftest(ctx, proxyID)
+		if err != nil {
+			return err
+		}
+		if !r.OK() {
+			return fmt.Errorf("enroll: selftest failed (%s): socks=%t http=%t egress=%s", r.Error, r.SocksOK, r.HTTPOK, r.EgressIP)
+		}
+		fmt.Fprintf(os.Stderr, "selftest: socks and http both answered, egress %s in %dms\n", r.EgressIP, r.LatencyMS)
+		return nil
+	}
+	return selftest, func(ctx context.Context) { _ = engine.Shutdown(ctx) }, nil
 }
 
 func printEnrollSummary(cfg config.Config, res *enroll.Result) {
@@ -177,20 +227,6 @@ func requireFarmHost(force bool) error {
 		return nil
 	}
 	return fmt.Errorf("%w: %s is absent. This command rewrites ip rules, systemd-networkd files and nft sets in the root network namespace. Create the marker on the real farm host, or pass --force if you are certain", errNotFarmHost, config.FarmMarker)
-}
-
-func parsePositiveInt(s string) (int, error) {
-	n := 0
-	if s == "" {
-		return 0, errors.New("empty")
-	}
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return 0, errors.New("not a number")
-		}
-		n = n*10 + int(r-'0')
-	}
-	return n, nil
 }
 
 func buildNetcfg(cfg config.Config) (netcfg.Manager, error) {

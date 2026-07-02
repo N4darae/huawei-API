@@ -387,7 +387,7 @@ func TestBackendUnitKeepsItsLoadBearingDirectives(t *testing.T) {
 		"ProtectSystem=strict",
 		"ReadWritePaths=/etc/systemd/network",
 		"ReadWritePaths=/etc/iproute2/rt_tables.d",
-		"preflight -- --fatal-only",
+		"preflight --fatal-only",
 	} {
 		if !strings.Contains(unit, must) {
 			t.Fatalf("dongled.service is missing %q", must)

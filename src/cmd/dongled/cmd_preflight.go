@@ -13,28 +13,38 @@ import (
 	"github.com/n4darae/huawei-API/src/internal/enroll"
 )
 
+type preflightCmd struct {
+	fatalOnly bool
+	asJSON    bool
+	quiet     bool
+}
+
 func init() {
+	c := &preflightCmd{}
 	Register(Command{
 		Name:  "preflight",
-		Usage: "check host readiness, read only (subcommand flags go after --)",
-		Run:   runPreflight,
+		Usage: "check host readiness, read only",
+		Flags: c.flags,
+		Run:   c.run,
 	})
 }
 
-func runPreflight(ctx context.Context, cfg config.Config, args []string) error {
-	fs := flag.NewFlagSet(config.Product+" preflight", flag.ContinueOnError)
-	fatalOnly := fs.Bool("fatal-only", false, "exit non-zero only when a fatal check fails")
-	asJSON := fs.Bool("json", false, "emit the report as json")
-	quiet := fs.Bool("quiet", false, "print nothing, report through the exit code")
-	if err := parseSubFlags(fs, args); err != nil {
+func (c *preflightCmd) flags(fs *flag.FlagSet) {
+	fs.BoolVar(&c.fatalOnly, "fatal-only", false, "exit non-zero only when a fatal check fails")
+	fs.BoolVar(&c.asJSON, "json", false, "emit the report as json")
+	fs.BoolVar(&c.quiet, "quiet", false, "print nothing, report through the exit code")
+}
+
+func (c *preflightCmd) run(ctx context.Context, cfg config.Config, args []string) error {
+	if err := rejectArgs("preflight", args); err != nil {
 		return err
 	}
 
 	report := enroll.Preflight(ctx, preflightOptions(cfg))
 
 	switch {
-	case *quiet:
-	case *asJSON:
+	case c.quiet:
+	case c.asJSON:
 		if err := writeJSON(report); err != nil {
 			return err
 		}
@@ -42,16 +52,16 @@ func runPreflight(ctx context.Context, cfg config.Config, args []string) error {
 		fmt.Print(report.Text())
 	}
 
-	if report.Green(*fatalOnly) {
+	if report.Green(c.fatalOnly) {
 		return nil
 	}
 	failed := report.Failed()
-	if *fatalOnly {
+	if c.fatalOnly {
 		failed = report.FatalFailed()
 	}
 	names := make([]string, 0, len(failed))
-	for _, c := range failed {
-		names = append(names, c.Name)
+	for _, ch := range failed {
+		names = append(names, ch.Name)
 	}
 	return fmt.Errorf("preflight: %d check(s) failed: %s", len(failed), strings.Join(names, ", "))
 }
@@ -70,38 +80,11 @@ func preflightOptions(cfg config.Config) enroll.PreflightOptions {
 	return o
 }
 
-func parseSubFlags(fs *flag.FlagSet, args []string) error {
-	fs.SetOutput(os.Stderr)
-	return fs.Parse(normalizeSubFlags(args))
-}
-
-func normalizeSubFlags(args []string) []string {
-	out := make([]string, 0, len(args))
-	for _, a := range args {
-		if strings.HasPrefix(a, "-") {
-			out = append(out, a)
-			continue
-		}
-		if k, _, ok := strings.Cut(a, "="); ok && k != "" && isFlagName(k) {
-			out = append(out, "-"+a)
-			continue
-		}
-		out = append(out, a)
+func rejectArgs(name string, args []string) error {
+	if len(args) == 0 {
+		return nil
 	}
-	return out
-}
-
-func isFlagName(s string) bool {
-	for i, r := range s {
-		switch {
-		case r >= 'a' && r <= 'z':
-		case r >= '0' && r <= '9' && i > 0:
-		case r == '-' && i > 0:
-		default:
-			return false
-		}
-	}
-	return s != ""
+	return fmt.Errorf("%s: unexpected argument %q", name, args[0])
 }
 
 func writeJSON(v any) error {
