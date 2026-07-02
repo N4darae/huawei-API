@@ -1,7 +1,7 @@
 # INSTALL.md — putting dongled on a machine
 
 Read `HARDWARE.md` first and buy the right hub. Everything below assumes you already have hardware
-that passes `dongled probe -- --experiment a6`.
+that passes `dongled probe --experiment a6`.
 
 Nothing in this document is automated behind your back. `dongled bootstrap` writes files and prints a
 list of commands; **it never creates an account, changes a sysctl, or restarts a service.** Those
@@ -107,14 +107,14 @@ bootstrap, which is the intent.
 Rehearse into a scratch directory first. This writes nothing to the real filesystem:
 
 ```
-dongled bootstrap -- --root /tmp/rehearse --apply --source /usr/local/share/dongled/deploy
+dongled bootstrap --root /tmp/rehearse --apply --source /usr/local/share/dongled/deploy
 find /tmp/rehearse -type f
 ```
 
 Read what it produced. When you are happy:
 
 ```
-sudo dongled bootstrap -- --apply --force
+sudo dongled bootstrap --apply --force
 ```
 
 `--force` is required whenever `--root` is empty; it is there so that a mistyped command cannot write
@@ -206,7 +206,7 @@ DONGLED_FW=nft
 EOF
 
 sudo systemctl daemon-reload
-sudo dongled preflight -public-host 203.0.113.7
+sudo dongled preflight --public-host 203.0.113.7
 ```
 
 Everything except `recent_backup` should be green. `nft_table` stays red until the controller has
@@ -215,7 +215,7 @@ built the table once; start it and check again:
 ```
 sudo systemctl enable --now dongled
 sudo systemctl status dongled
-sudo dongled preflight -public-host 203.0.113.7
+sudo dongled preflight --public-host 203.0.113.7
 ```
 
 `dongled.service` runs its own fatal preflight as `ExecStartPre`, so a red fatal check prevents
@@ -223,16 +223,17 @@ startup rather than producing a half-working farm.
 
 ### A note on the command line
 
-Global flags come **before** `--`, subcommand flags **after** it:
+Global flags and subcommand flags mix freely, in any order, with no separator:
 
 ```
-dongled preflight -public-host 203.0.113.7 -- --fatal-only --json
-dongled enroll    -public-host 203.0.113.7 -- --slot 3
+dongled preflight --public-host 203.0.113.7 --fatal-only --json
+dongled enroll --public-host 203.0.113.7 --slot 3
+dongled probe --experiment a3 --rounds 20 --out docs/OPERATIONS.md
 ```
 
-The bare `--` is not decoration. The process-wide flag set is parsed first, and it does not know about
-`--slot`; the separator hands the rest to the subcommand. `key=value` also works without the
-separator, for example `dongled enroll slot=3`.
+`--public-host`, `--node-id`, `--db`, `--device`, `--netcfg`, `--proxy` and `--fw` are global and
+accepted by every subcommand; the rest belong to the subcommand you named. `dongled <command> -h`
+lists both sets together. Single-dash spellings (`-slot 3`) work too, as they do for any Go program.
 
 ---
 
@@ -258,7 +259,7 @@ is logged on either side**. It gets found days later by a customer.
 One dongle at a time. This is enforced, not advisory.
 
 ```
-sudo dongled enroll -public-host 203.0.113.7 -- --slot 1 --carrier viettel
+sudo dongled enroll --public-host 203.0.113.7 --slot 1 --carrier viettel
 ```
 
 What it does, in order — the order is load-bearing:

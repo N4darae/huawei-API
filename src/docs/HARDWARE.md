@@ -48,7 +48,7 @@ A usable hub prints a line ending in `ppps`:
 Current status for hub 1-13 [2109:2817 VIA Labs, Inc. USB3.0 Hub, USB 3.00, 4 ports, ppps]
 ```
 
-`dongled probe -- --experiment a6` does exactly this check for you and turns it into a pass/fail line.
+`dongled probe --experiment a6` does exactly this check for you and turns it into a pass/fail line.
 
 Hubs that are widely reported to do PPPS correctly are built on **VIA Labs VL812 / VL813 / VL817** and
 **Genesys Logic GL3520** controllers. Ask the seller for the controller part number; the brand name on
@@ -192,7 +192,7 @@ There are two firmware families with the same plastic:
 - **E3372s (Stick)** — presents serial ports and speaks AT commands. **Not supported.**
 
 If `192.168.8.1` does not answer HTTP after plugging one in, you have a stick-mode unit or one that
-has been flashed. `dongled probe -- --experiment login` identifies the SKU and firmware exactly.
+has been flashed. `dongled probe --experiment login` identifies the SKU and firmware exactly.
 
 ### 5.2 Every dongle must have "Require login" turned OFF
 
@@ -214,7 +214,7 @@ carrier policy, not a device feature, and it varies. Before committing to a bulk
 gate:
 
 ```
-dongled probe -- --experiment a3 --addr 192.168.8.1 --rounds 20 --out docs/OPERATIONS.md
+dongled probe --experiment a3 --addr 192.168.8.1 --rounds 20 --out docs/OPERATIONS.md
 ```
 
 If no hold length up to 40 s produces a new address at least ~70% of the time, that carrier cannot be
@@ -244,10 +244,10 @@ Scale by adding hubs, not by buying a bigger one.
 uname -r                                            # >= 6.2
 ip -4 -o addr show | grep -v dynamic                # your public IP must be here
 sudo uhubctl                                        # every hub line must end in ppps
-dongled probe -- --experiment a6                    # all of the above, as pass/fail
-dongled probe -- --experiment login                 # SKU, firmware, no password
-dongled probe -- --experiment a4 --iface usb0       # is carrier/operstate trustworthy
-dongled probe -- --experiment a3 --rounds 20        # the gate that decides the product
+dongled probe --experiment a6                    # all of the above, as pass/fail
+dongled probe --experiment login                 # SKU, firmware, no password
+dongled probe --experiment a4 --iface usb0       # is carrier/operstate trustworthy
+dongled probe --experiment a3 --rounds 20        # the gate that decides the product
 ```
 
 Record the output. `--out docs/OPERATIONS.md` appends a dated section to the measurements log so the

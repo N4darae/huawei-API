@@ -140,7 +140,7 @@ fi
 if [ ! -x "$BIN_3PROXY" ]; then
     bad 3proxy_binary "$BIN_3PROXY is missing; build the pinned commit $PIN_COMMIT"
 elif [ ! -r "$PIN_FILE" ]; then
-    bad 3proxy_binary "$PIN_FILE holds no pin record; run 'dongled bootstrap -- --apply' to record it"
+    bad 3proxy_binary "$PIN_FILE holds no pin record; run 'dongled bootstrap --apply' to record it"
 else
     have="$(sha256sum "$BIN_3PROXY" | cut -d' ' -f1)"
     want="$(tr ' ' '\n' < "$PIN_FILE" | sed -n 's/^sha256://p')"

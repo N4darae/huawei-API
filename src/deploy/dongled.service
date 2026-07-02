@@ -18,9 +18,6 @@
 #   3. ExecStartPre runs the fatal half of the preflight. If the priority-900
 #      rule, rp_filter or the nft table are missing, starting the panel would
 #      silently sell broken proxies.
-#
-# The `--` before the subcommand flags is required: the global flag set is
-# parsed before the subcommand sees its arguments.
 
 [Unit]
 Description=dongled proxy farm controller
@@ -33,7 +30,7 @@ StartLimitBurst=5
 [Service]
 Type=notify
 NotifyAccess=main
-ExecStartPre=/usr/local/bin/dongled preflight -- --fatal-only
+ExecStartPre=/usr/local/bin/dongled preflight --fatal-only
 ExecStart=/usr/local/bin/dongled serve
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure

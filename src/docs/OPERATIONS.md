@@ -333,8 +333,8 @@ there, on purpose.
 
 ```
 dongled backup                       # snapshot + integrity check, records last_backup_at
-dongled backup -- --list             # newest snapshot and its age
-dongled backup -- --verify /var/backups/dongled/dongled-20260808T101500Z.db
+dongled backup --list             # newest snapshot and its age
+dongled backup --verify /var/backups/dongled/dongled-20260808T101500Z.db
 ```
 
 `preflight` turns `recent_backup` red after 7 days.
@@ -393,11 +393,11 @@ dmesg | grep dongled-                    # nft ssrf and leak drops, rate limited
 This section is the log of what the hardware actually did. `dongled probe` appends to it:
 
 ```
-dongled probe -- --experiment a3 --rounds 20 --out docs/OPERATIONS.md
-dongled probe -- --experiment a2 --slot 1 --out docs/OPERATIONS.md
-dongled probe -- --experiment a4 --iface dg01 --out docs/OPERATIONS.md
-dongled probe -- --experiment a6 --out docs/OPERATIONS.md
-dongled probe -- --experiment login --out docs/OPERATIONS.md
+dongled probe --experiment a3 --rounds 20 --out docs/OPERATIONS.md
+dongled probe --experiment a2 --slot 1 --out docs/OPERATIONS.md
+dongled probe --experiment a4 --iface dg01 --out docs/OPERATIONS.md
+dongled probe --experiment a6 --out docs/OPERATIONS.md
+dongled probe --experiment login --out docs/OPERATIONS.md
 ```
 
 Add `--json-out results/a3.json` when you want the numbers in a form something else can read.
