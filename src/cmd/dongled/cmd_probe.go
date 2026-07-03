@@ -598,7 +598,7 @@ func rotateOnce(ctx context.Context, d device.Device, hold time.Duration, cfg co
 		return old, netip.Addr{}, 0, err
 	}
 	if err := waitStatus(ctx, d, cfg, clock, func(s device.Status) bool {
-		return s.ConnectionStatus.Connected() && s.WanIP.IsValid()
+		return s.ConnectionStatus.Connected()
 	}); err != nil {
 		return old, netip.Addr{}, time.Since(started), fmt.Errorf("never reconnected: %w", err)
 	}
