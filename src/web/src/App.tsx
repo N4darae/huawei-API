@@ -34,9 +34,9 @@ function ConnBadge() {
   const tone = live.status === 'live' ? (live.stale ? 'warn' : 'ok') : 'warn'
 
   return (
-    <span className="conn" title={live.nodeId ? `node ${live.nodeId}` : undefined}>
+    <span className="sidebar-status-line" title={live.nodeId ? `node ${live.nodeId}` : undefined}>
       <Badge tone={tone}>{label}</Badge>
-      <span className="faint">{age ? `last event ${age}` : 'no events yet'}</span>
+      <span className="conn">{age ? `last event ${age}` : 'no events yet'}</span>
     </span>
   )
 }
@@ -58,11 +58,10 @@ function HealthBadge() {
 function ThemePicker() {
   const [choice, setChoice] = useState<ThemeChoice>(readTheme)
   return (
-    <label className="row" style={{ gap: 6 }}>
+    <label className="col" style={{ gap: 4, padding: '0 6px' }}>
       <span className="sr-only">Theme</span>
       <select
         className="field-input"
-        style={{ width: 'auto' }}
         value={choice}
         onChange={(e) => {
           const v = e.target.value as ThemeChoice
@@ -84,25 +83,33 @@ export function Shell() {
   useTitleSync(path === '/' ? 'Proxies · dongled' : path === '/dongles' ? 'Dongles · dongled' : 'API keys · dongled')
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <span className="brand">dongled</span>
-        <nav className="nav" aria-label="Main">
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <span className="sidebar-mark" aria-hidden="true" />
+          dongled
+        </div>
+        <nav className="sidebar-nav" aria-label="Main">
           {ROUTES.map((r) => (
             <Link key={r.path} to={r.path}>
               {r.label}
             </Link>
           ))}
         </nav>
-        <span className="grow" />
-        <HealthBadge />
-        <ConnBadge />
-        <ThemePicker />
-        <Button busy={logout.isPending} onClick={() => logout.mutate()}>
-          Sign out
-        </Button>
-      </header>
-      {path === '/dongles' ? <DonglesPage /> : path === '/keys' ? <KeysPage /> : <ProxiesPage />}
+        <div className="sidebar-foot">
+          <div className="sidebar-status">
+            <HealthBadge />
+            <ConnBadge />
+          </div>
+          <ThemePicker />
+          <Button variant="ghost" busy={logout.isPending} onClick={() => logout.mutate()}>
+            Sign out
+          </Button>
+        </div>
+      </aside>
+      <main className="main">
+        {path === '/dongles' ? <DonglesPage /> : path === '/keys' ? <KeysPage /> : <ProxiesPage />}
+      </main>
     </div>
   )
 }
