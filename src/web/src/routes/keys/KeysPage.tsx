@@ -111,7 +111,7 @@ function KeyRow({ apiKey }: { apiKey: ApiKey }) {
   return (
     <section className="card">
       <div className="row">
-        <span className="grow col" style={{ gap: 0 }}>
+        <span className="identity" style={{ gap: 0 }}>
           <span style={{ fontWeight: 600 }}>{apiKey.name}</span>
           <span className="faint mono">
             {apiKey.prefix}… · created {formatClock(apiKey.created_at)} · last used{' '}
@@ -145,7 +145,7 @@ function KeyRow({ apiKey }: { apiKey: ApiKey }) {
           {(apiKey.link_tokens ?? []).map((t) => (
             <li key={t.id} className="list-item" style={{ cursor: 'default' }}>
               <div className="row">
-                <span className="mono grow">
+                <span className="mono">
                   {LINK_BASE}/{t.id.slice(0, 6)}…
                 </span>
                 {t.revoked_at != null ? (
@@ -167,7 +167,7 @@ function KeyRow({ apiKey }: { apiKey: ApiKey }) {
             </li>
           ))}
           {(apiKey.link_tokens ?? []).length === 0 ? (
-            <li className="muted">No rotate link issued for this key.</li>
+            <li className="list-empty">No rotate link issued for this key.</li>
           ) : null}
         </ul>
 
@@ -215,6 +215,7 @@ export function KeysPage() {
 
   return (
     <div className="page">
+      <div className="page-col">
       <div className="page-head">
         <h1 className="page-title">API keys</h1>
         <span className="muted">{list.data?.items.length ?? 0} keys</span>
@@ -248,8 +249,9 @@ export function KeysPage() {
       ))}
 
       {list.data && list.data.items.length === 0 ? (
-        <span className="muted">No API keys yet.</span>
+        <div className="list-empty">No API keys yet.</div>
       ) : null}
+      </div>
     </div>
   )
 }

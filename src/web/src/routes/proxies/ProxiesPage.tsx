@@ -122,13 +122,13 @@ export function ProxiesPage() {
     {
       key: 'status',
       header: 'Status',
-      width: '110px',
+      width: '96px',
       cell: (p) => <Badge tone={PROXY_STATE_TONE[p.state]}>{p.state}</Badge>,
     },
     {
       key: 'proxy',
       header: 'Proxy',
-      width: '250px',
+      width: '210px',
       cell: (p) => (
         <span className="col" style={{ gap: 0 }}>
           <span className="mono">
@@ -143,7 +143,7 @@ export function ProxiesPage() {
     {
       key: 'customer',
       header: 'Customer',
-      width: '150px',
+      width: '120px',
       cell: (p) =>
         p.customer_name || p.customer_id ? (
           <span>{p.customer_name || p.customer_id}</span>
@@ -154,7 +154,7 @@ export function ProxiesPage() {
     {
       key: 'expires',
       header: 'Expires',
-      width: '120px',
+      width: '100px',
       cell: (p) => {
         const e = formatExpiry(p.expires_at, now)
         return e.tone === 'neutral' ? <span className="muted">{e.text}</span> : <Badge tone={e.tone}>{e.text}</Badge>
@@ -163,13 +163,13 @@ export function ProxiesPage() {
     {
       key: 'wan',
       header: 'WAN IP',
-      width: '130px',
+      width: '116px',
       cell: (p) => (p.wan_ip ? <span className="mono">{p.wan_ip}</span> : <span className="faint">no address</span>),
     },
     {
       key: 'signal',
       header: 'Signal',
-      width: '110px',
+      width: '92px',
       cell: (p) => (
         <span className={'mono ' + (signalTone(p.signal_bars) === 'danger' ? '' : 'muted')}>
           {signalText(p.signal_bars)}
@@ -179,7 +179,7 @@ export function ProxiesPage() {
     {
       key: 'data',
       header: 'Data (SIM quota)',
-      width: '170px',
+      width: '150px',
       cell: (p) => (
         <Meter
           label={`SIM quota used for ${p.id}`}
@@ -192,13 +192,13 @@ export function ProxiesPage() {
     {
       key: 'ports',
       header: 'Ports (observed)',
-      width: '150px',
+      width: '132px',
       cell: (p) => <PortsCell proxy={p} />,
     },
     {
       key: 'actions',
       header: 'Actions',
-      width: '230px',
+      width: '176px',
       cell: (p) => (
         <ActionsCell
           proxy={p}
@@ -217,6 +217,7 @@ export function ProxiesPage() {
 
   return (
     <div className="page">
+      <div className="page-col">
       <div className="page-head">
         <h1 className="page-title">Proxies</h1>
         <span className="muted">
@@ -234,8 +235,14 @@ export function ProxiesPage() {
           value={term}
           placeholder="id, host, customer, WAN IP"
           onChange={(e) => setTerm(e.target.value)}
+          style={{ width: 260 }}
         />
-        <Select label="State" value={state} onChange={(e) => setState(e.target.value as ProxyState | '')}>
+        <Select
+          label="State"
+          value={state}
+          onChange={(e) => setState(e.target.value as ProxyState | '')}
+          style={{ width: 160 }}
+        >
           <option value="">any state</option>
           {STATES.map((s) => (
             <option key={s} value={s}>
@@ -243,7 +250,12 @@ export function ProxiesPage() {
             </option>
           ))}
         </Select>
-        <Select label="Expiring within" value={expiring} onChange={(e) => setExpiring(e.target.value)}>
+        <Select
+          label="Expiring within"
+          value={expiring}
+          onChange={(e) => setExpiring(e.target.value)}
+          style={{ width: 160 }}
+        >
           <option value="">any time</option>
           <option value="3">3 days</option>
           <option value="7">7 days</option>
@@ -280,6 +292,7 @@ export function ProxiesPage() {
         }}
         empty={list.isPending ? 'Loading proxies…' : 'No proxies match this filter.'}
       />
+      </div>
 
       <ProxyDrawer
         proxyId={selected}
