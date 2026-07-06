@@ -17,7 +17,10 @@ export function LoginForm() {
         login.mutate({ username, password })
       }}
     >
-      <h1 className="page-title">dongled</h1>
+      <div className="col" style={{ gap: 4 }}>
+        <h1 className="page-title">dongled</h1>
+        <p className="login-sub">Sign in to manage proxies and dongles.</p>
+      </div>
       <Input
         label="Username"
         name="username"
