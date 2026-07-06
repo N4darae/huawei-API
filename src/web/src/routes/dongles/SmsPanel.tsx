@@ -68,8 +68,10 @@ export function SmsPanel({ dongleId }: { dongleId: string }) {
       </section>
 
       <section className="card">
-        <div className="row">
-          <h3 className="card-title grow">Inbox</h3>
+        <div className="row" style={{ alignItems: 'flex-end' }}>
+          <h3 className="card-title" style={{ paddingBottom: 6 }}>
+            Inbox
+          </h3>
           <Select
             label="Box"
             value={String(box)}
@@ -104,7 +106,6 @@ export function SmsPanel({ dongleId }: { dongleId: string }) {
                 <span>{formatClock(m.sent_at)}</span>
                 {m.is_fragment ? <Badge tone="warn">{FRAGMENT_MARKER}</Badge> : null}
                 {!m.read ? <Badge tone="info">unread</Badge> : null}
-                <span className="grow" />
                 {!m.read ? (
                   <Button onClick={() => read.mutate({ dongleId, index: m.index })} aria-label={`Mark ${m.index} read`}>
                     Mark read
@@ -124,7 +125,7 @@ export function SmsPanel({ dongleId }: { dongleId: string }) {
               </div>
             </li>
           ))}
-          {items.length === 0 && !list.isPending ? <li className="muted">No messages.</li> : null}
+          {items.length === 0 && !list.isPending ? <li className="list-empty">No messages.</li> : null}
         </ul>
       </section>
     </div>
