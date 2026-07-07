@@ -110,29 +110,34 @@ function KeyRow({ apiKey }: { apiKey: ApiKey }) {
 
   return (
     <section className="card">
-      <div className="row">
+      <div className="row" style={{ alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <span className="identity" style={{ gap: 0 }}>
           <span style={{ fontWeight: 600 }}>{apiKey.name}</span>
-          <span className="faint mono">
-            {apiKey.prefix}… · created {formatClock(apiKey.created_at)} · last used{' '}
-            {formatAgo(apiKey.last_used_at, now)}
+          <span className="faint mono meta-line">
+            <span>{apiKey.prefix}…</span>
+            <span>·</span>
+            <span>created {formatClock(apiKey.created_at)}</span>
+            <span>·</span>
+            <span>last used {formatAgo(apiKey.last_used_at, now)}</span>
           </span>
         </span>
-        {revoked ? <Badge tone="danger">revoked</Badge> : <Badge tone="ok">active</Badge>}
-        {apiKey.scopes.map((s) => (
-          <Badge key={s} tone="info">
-            {s}
-          </Badge>
-        ))}
-        <Button
-          variant="danger"
-          disabled={revoked}
-          busy={revoke.isPending}
-          onClick={() => revoke.mutate(apiKey.id)}
-          aria-label={`Revoke key ${apiKey.name}`}
-        >
-          Revoke key
-        </Button>
+        <span className="row" style={{ flex: 'none' }}>
+          {revoked ? <Badge tone="danger">revoked</Badge> : <Badge tone="ok">active</Badge>}
+          {apiKey.scopes.map((s) => (
+            <Badge key={s} tone="info">
+              {s}
+            </Badge>
+          ))}
+          <Button
+            variant="danger"
+            disabled={revoked}
+            busy={revoke.isPending}
+            onClick={() => revoke.mutate(apiKey.id)}
+            aria-label={`Revoke key ${apiKey.name}`}
+          >
+            Revoke key
+          </Button>
+        </span>
       </div>
 
       {apiKey.proxy_ids && apiKey.proxy_ids.length > 0 ? (
@@ -190,19 +195,19 @@ function KeyRow({ apiKey }: { apiKey: ApiKey }) {
           </Notice>
         ) : null}
 
-        <div className="row">
-          <Button
-            busy={createLink.isPending}
-            disabled={revoked}
-            onClick={() =>
-              createLink.mutate(apiKey.id, { onSuccess: (res) => setLinkOnce(res.url) })
-            }
-          >
-            Create rotate link
-          </Button>
-          <span className="muted">
-            Created and revoked independently of the key itself.
-          </span>
+        <div className="col" style={{ gap: 6 }}>
+          <div className="row">
+            <Button
+              busy={createLink.isPending}
+              disabled={revoked}
+              onClick={() =>
+                createLink.mutate(apiKey.id, { onSuccess: (res) => setLinkOnce(res.url) })
+              }
+            >
+              Create rotate link
+            </Button>
+          </div>
+          <span className="muted">Created and revoked independently of the key itself.</span>
         </div>
       </div>
     </section>

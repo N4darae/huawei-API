@@ -708,9 +708,21 @@ textarea.field-input {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1 1 auto;
   min-width: 0;
-  max-width: 420px;
   overflow-wrap: anywhere;
+}
+
+.meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--s2);
+  row-gap: 2px;
+}
+
+.meta-line > * {
+  white-space: nowrap;
 }
 
 .tabs {
