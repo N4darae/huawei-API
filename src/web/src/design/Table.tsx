@@ -5,6 +5,7 @@ export interface Column<T> {
   header: string
   width?: string
   align?: 'left' | 'right'
+  sticky?: 'right'
   cell: (row: T) => ReactNode
 }
 
@@ -37,7 +38,12 @@ export function Table<T>({
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key} scope="col" style={c.width ? { width: c.width } : undefined}>
+              <th
+                key={c.key}
+                scope="col"
+                className={c.sticky ? 'tbl-sticky' : undefined}
+                style={c.width ? { width: c.width } : undefined}
+              >
                 {c.header}
               </th>
             ))}
@@ -53,7 +59,11 @@ export function Table<T>({
                 onDoubleClick={onRowActivate ? () => onRowActivate(row) : undefined}
               >
                 {columns.map((c) => (
-                  <td key={c.key} style={c.align === 'right' ? { textAlign: 'right' } : undefined}>
+                  <td
+                    key={c.key}
+                    className={c.sticky ? 'tbl-sticky' : undefined}
+                    style={c.align === 'right' ? { textAlign: 'right' } : undefined}
+                  >
                     {c.cell(row)}
                   </td>
                 ))}

@@ -199,6 +199,7 @@ export function ProxiesPage() {
       key: 'actions',
       header: 'Actions',
       width: '176px',
+      sticky: 'right',
       cell: (p) => (
         <ActionsCell
           proxy={p}
@@ -217,7 +218,7 @@ export function ProxiesPage() {
 
   return (
     <div className="page">
-      <div className="page-col">
+      <div className="page-col" style={{ paddingBottom: 0 }}>
       <div className="page-head">
         <h1 className="page-title">Proxies</h1>
         <span className="muted">
@@ -279,19 +280,21 @@ export function ProxiesPage() {
           {list.error.message}
         </Notice>
       ) : null}
+      </div>
 
-      <Table
-        caption="Proxies"
-        columns={columns}
-        rows={rows}
-        rowKey={(p) => p.id}
-        selectedKey={selected}
-        onRowActivate={(p) => {
-          setAutoRotate(false)
-          setSelected(p.id)
-        }}
-        empty={list.isPending ? 'Loading proxies…' : 'No proxies match this filter.'}
-      />
+      <div className="page-col-bleed">
+        <Table
+          caption="Proxies"
+          columns={columns}
+          rows={rows}
+          rowKey={(p) => p.id}
+          selectedKey={selected}
+          onRowActivate={(p) => {
+            setAutoRotate(false)
+            setSelected(p.id)
+          }}
+          empty={list.isPending ? 'Loading proxies…' : 'No proxies match this filter.'}
+        />
       </div>
 
       <ProxyDrawer

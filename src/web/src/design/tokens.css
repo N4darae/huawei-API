@@ -64,6 +64,7 @@
   --row-h: 40px;
   --grid-min: 1000px;
   --content-max: 1180px;
+  --content-max-wide: 1560px;
   --sidebar-w: 236px;
 }
 
@@ -514,6 +515,19 @@ textarea.field-input {
   color: var(--fg-muted);
 }
 
+.tbl-sticky {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+}
+
+.tbl thead th.tbl-sticky {
+  z-index: 3;
+  background: var(--bg-raised);
+}
+
 .meter {
   display: flex;
   flex-direction: column;
@@ -900,6 +914,13 @@ textarea.field-input {
   display: flex;
   flex-direction: column;
   gap: var(--s7);
+}
+
+.page-col-bleed {
+  max-width: var(--content-max-wide);
+  margin-inline: auto;
+  margin-top: var(--s7);
+  padding: 0 var(--s7) var(--s10);
 }
 
 .page-head {
