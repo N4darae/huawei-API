@@ -16,28 +16,34 @@ import {
 
 const STATES: ProxyState[] = ['active', 'suspended', 'disabled', 'expired', 'degraded', 'unknown']
 
-function PortsCell({ proxy }: { proxy: Proxy }) {
+function ProxyCell({ proxy }: { proxy: Proxy }) {
   const s = proxy.ports_bound.socks
   const h = proxy.ports_bound.http
   return (
-    <span className="row" style={{ gap: 10 }}>
-      <span className="row" style={{ gap: 4 }}>
-        <span className="mono">S</span>
+    <span className="col" style={{ gap: 0 }}>
+      <span className="row mono" style={{ gap: 4, flexWrap: 'nowrap' }}>
+        <span>
+          {proxy.host}:{proxy.socks_port}
+        </span>
         <Dot
           filled={s}
           tone={s ? 'ok' : 'danger'}
           label={s ? 'SOCKS listener observed bound' : 'SOCKS listener NOT bound'}
         />
       </span>
-      <span className="row" style={{ gap: 4 }}>
-        <span className="mono">H</span>
+      <span className="row faint mono" style={{ gap: 4, flexWrap: 'nowrap' }}>
+        <span>http {proxy.http_port}</span>
         <Dot
           filled={h}
           tone={h ? 'ok' : 'danger'}
           label={h ? 'HTTP listener observed bound' : 'HTTP listener NOT bound'}
         />
+        <span>· slot {proxy.slot}</span>
       </span>
-      {proxy.ports_bound.probe_ok === false ? <span className="faint">probe failed</span> : null}
+      <span className="faint mono">
+        {proxy.username}
+        {proxy.ports_bound.probe_ok === false ? ' · probe failed' : ''}
+      </span>
     </span>
   )
 }
@@ -128,17 +134,8 @@ export function ProxiesPage() {
     {
       key: 'proxy',
       header: 'Proxy',
-      width: '210px',
-      cell: (p) => (
-        <span className="col" style={{ gap: 0 }}>
-          <span className="mono">
-            {p.host}:{p.socks_port}
-          </span>
-          <span className="faint mono">
-            slot {p.slot} · http {p.http_port} · {p.username}
-          </span>
-        </span>
-      ),
+      width: '230px',
+      cell: (p) => <ProxyCell proxy={p} />,
     },
     {
       key: 'customer',
@@ -168,32 +165,21 @@ export function ProxiesPage() {
     },
     {
       key: 'signal',
-      header: 'Signal',
-      width: '92px',
+      header: 'Signal & quota',
+      width: '190px',
       cell: (p) => (
-        <span className={'mono ' + (signalTone(p.signal_bars) === 'danger' ? '' : 'muted')}>
-          {signalText(p.signal_bars)}
+        <span className="col" style={{ gap: 4 }}>
+          <span className={'mono ' + (signalTone(p.signal_bars) === 'danger' ? '' : 'muted')}>
+            {signalText(p.signal_bars)}
+          </span>
+          <Meter
+            label={`SIM quota used for ${p.id}`}
+            value={p.data_used_bytes ?? 0}
+            max={p.data_cap_bytes ?? 0}
+            format={formatBytes}
+          />
         </span>
       ),
-    },
-    {
-      key: 'data',
-      header: 'Data (SIM quota)',
-      width: '150px',
-      cell: (p) => (
-        <Meter
-          label={`SIM quota used for ${p.id}`}
-          value={p.data_used_bytes ?? 0}
-          max={p.data_cap_bytes ?? 0}
-          format={formatBytes}
-        />
-      ),
-    },
-    {
-      key: 'ports',
-      header: 'Ports (observed)',
-      width: '132px',
-      cell: (p) => <PortsCell proxy={p} />,
     },
     {
       key: 'actions',
@@ -264,15 +250,24 @@ export function ProxiesPage() {
         </Select>
       </div>
 
-      {unbound > 0 ? (
-        <Notice tone="danger" title={`${unbound} proxies have a listener that is not bound`}>
-          3proxy exits 0 with no listener when its config is rejected, so &quot;running&quot; means
-          nothing. These rows show what the backend actually observed.
-        </Notice>
-      ) : null}
+      {unbound > 0 || overQuota > 0 ? (
+        <div className="page-alerts">
+          {unbound > 0 ? (
+            <Notice
+              compact
+              tone="danger"
+              title={`${unbound} proxies have a listener that is not bound`}
+              hint={
+                '3proxy exits 0 with no listener when its config is rejected, so "running" means ' +
+                'nothing. These rows show what the backend actually observed.'
+              }
+            />
+          ) : null}
 
-      {overQuota > 0 ? (
-        <Notice tone="warn" title={`${overQuota} SIMs are at or above 90% of their quota`} />
+          {overQuota > 0 ? (
+            <Notice compact tone="warn" title={`${overQuota} SIMs are at or above 90% of their quota`} />
+          ) : null}
+        </div>
       ) : null}
 
       {list.isError ? (
