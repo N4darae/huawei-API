@@ -37,11 +37,18 @@ export interface NoticeProps {
   tone: Tone
   title: ReactNode
   children?: ReactNode
+  compact?: boolean
+  hint?: string
 }
 
-export function Notice({ tone, title, children }: NoticeProps) {
+export function Notice({ tone, title, children, compact = false, hint }: NoticeProps) {
   return (
-    <div className="notice" data-tone={tone} role={tone === 'danger' ? 'alert' : 'status'}>
+    <div
+      className={compact ? 'notice notice-compact' : 'notice'}
+      data-tone={tone}
+      role={tone === 'danger' ? 'alert' : 'status'}
+      title={hint}
+    >
       <span className="notice-title">{title}</span>
       {children ? <span>{children}</span> : null}
     </div>

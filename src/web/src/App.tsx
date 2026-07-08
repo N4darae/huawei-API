@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import { Badge, Button, ToastProvider, applyTheme, readTheme, useToast } from './design'
-import type { ThemeChoice } from './design'
+import { Button, Dot, ToastProvider, applyTheme, readTheme, useToast } from './design'
+import type { ThemeChoice, Tone } from './design'
 import { createQueryClient, useHealth, useLogout, useNow } from './api/query'
 import { LiveProvider, useLive } from './api/sse'
+import type { LiveStatus } from './api/sse'
 import type { Topic } from './api/events'
 import { AuthGate } from './auth'
 import { Link, ROUTES, useRoutePath, useTitleSync } from './router'
@@ -15,53 +16,53 @@ import { formatAgo } from './routes/proxies/format'
 
 const TOPICS: Topic[] = ['proxies', 'dongles', 'operations', 'sms', 'system']
 
-function ConnBadge() {
-  const live = useLive()
-  const now = useNow(2000)
-  const age = live.lastEventAt == null ? null : formatAgo(live.lastEventAt, now)
-
-  const label =
-    live.status === 'live'
-      ? live.stale
-        ? 'live stream silent'
-        : 'live'
-      : live.status === 'reconnecting'
-        ? 'stream lost — reconnecting'
-        : live.status === 'connecting'
-          ? 'stream connecting'
-          : 'no stream — polling'
-
-  const tone = live.status === 'live' ? (live.stale ? 'warn' : 'ok') : 'warn'
-
-  return (
-    <span className="sidebar-status-line" title={live.nodeId ? `node ${live.nodeId}` : undefined}>
-      <Badge tone={tone}>{label}</Badge>
-      <span className="conn">{age ? `last event ${age}` : 'no events yet'}</span>
-    </span>
-  )
+function streamTone(status: LiveStatus, stale: boolean): Tone {
+  return status === 'live' && !stale ? 'ok' : 'warn'
 }
 
-function HealthBadge() {
+function streamLabel(status: LiveStatus, stale: boolean): string {
+  if (status === 'live') return stale ? 'live stream silent' : 'live'
+  if (status === 'reconnecting') return 'stream lost — reconnecting'
+  if (status === 'connecting') return 'stream connecting'
+  return 'no stream — polling'
+}
+
+function SidebarHealth() {
   const health = useHealth()
-  if (health.isError) return <Badge tone="danger">panel unreachable</Badge>
-  const h = health.data
-  if (!h) return null
-  const bad = h.invariants.filter((i) => !i.ok)
-  if (h.status === 'ok' && bad.length === 0) return <Badge tone="ok">invariants ok</Badge>
+  const live = useLive()
+  const now = useNow(2000)
+
+  const bad = health.data?.invariants.filter((i) => !i.ok) ?? []
+  const healthOk = !health.isError && health.data?.status === 'ok' && bad.length === 0
+  const healthLabel = health.isError
+    ? 'panel unreachable'
+    : bad.length > 0
+      ? `${bad.length} invariants failing`
+      : 'invariants ok'
+
+  const streamText = streamLabel(live.status, live.stale)
+  const age =
+    live.lastEventAt == null ? 'no events yet' : `last event ${formatAgo(live.lastEventAt, now)}`
+
+  const tone: Tone = !healthOk ? 'danger' : streamTone(live.status, live.stale)
+  const summary = healthOk ? streamText : healthLabel
+  const detail = [healthLabel, streamText, age].join(' · ')
+
   return (
-    <Badge tone="danger" title={bad.map((i) => `${i.name}: ${i.detail ?? 'failed'}`).join('\n')}>
-      {bad.length} invariants failing
-    </Badge>
+    <span className="sidebar-health" data-tone={tone} title={detail}>
+      <Dot tone={tone} filled label={detail} />
+      <span className="sidebar-health-text">{summary}</span>
+    </span>
   )
 }
 
 function ThemePicker() {
   const [choice, setChoice] = useState<ThemeChoice>(readTheme)
   return (
-    <label className="col" style={{ gap: 4, padding: '0 6px' }}>
+    <label className="row" style={{ gap: 4 }}>
       <span className="sr-only">Theme</span>
       <select
-        className="field-input"
+        className="field-input theme-select"
         value={choice}
         onChange={(e) => {
           const v = e.target.value as ThemeChoice
@@ -97,14 +98,13 @@ export function Shell() {
           ))}
         </nav>
         <div className="sidebar-foot">
-          <div className="sidebar-status">
-            <HealthBadge />
-            <ConnBadge />
+          <SidebarHealth />
+          <div className="sidebar-foot-row">
+            <ThemePicker />
+            <Button variant="ghost" busy={logout.isPending} onClick={() => logout.mutate()}>
+              Sign out
+            </Button>
           </div>
-          <ThemePicker />
-          <Button variant="ghost" busy={logout.isPending} onClick={() => logout.mutate()}>
-            Sign out
-          </Button>
         </div>
       </aside>
       <main className="main">
