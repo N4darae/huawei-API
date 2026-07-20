@@ -500,12 +500,11 @@ func (a *API) acceptSync(w http.ResponseWriter, r *http.Request, kind domain.OpK
 		Kind:        kind,
 		SubjectType: subject,
 		SubjectID:   id,
-		State:       domain.OpSucceeded,
+		State:       domain.OpRunning,
 		Step:        devops.StepDone,
 		Pct:         100,
 		StartedAt:   now,
 		DeadlineAt:  now,
-		FinishedAt:  &now,
 		Trigger:     domain.TriggerAdminUI,
 		ActorType:   domain.ActorAdmin,
 		RequestID:   requestID(r),
@@ -518,6 +517,9 @@ func (a *API) acceptSync(w http.ResponseWriter, r *http.Request, kind domain.OpK
 		writeError(w, r, translate(err))
 		return
 	}
+	op.State = domain.OpSucceeded
+	op.ResultJSON = "{}"
+	op.FinishedAt = &now
 	a.publishOp(r.Context(), op, eventbus.EvOpDone)
 	WriteJSON(w, http.StatusAccepted, acceptedDTO(op))
 }
