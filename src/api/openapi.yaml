@@ -53,7 +53,7 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "429":
-          $ref: "#/components/responses/Error"
+          $ref: "#/components/responses/RateLimited"
 
   /api/v1/auth/logout:
     post:
@@ -95,6 +95,9 @@ paths:
         - name: expiring_within_days
           in: query
           required: false
+          description: >-
+            Keeps proxies whose expires_at is at or before now plus this many days. Already expired
+            proxies are included, because they are the ones an operator most needs to see.
           schema:
             type: integer
       responses:
@@ -109,6 +112,13 @@ paths:
     get:
       tags: [proxies]
       operationId: exportProxies
+      description: >-
+        txt emits host:port:user:pass, one proxy per line, with no trailing newline. csv emits the
+        header row host,port,username,password followed by the same fields, RFC4180 quoted. A proxy
+        whose auth_mode is iplist carries no credentials and is emitted as host:port in txt and with
+        two empty trailing fields in csv. A userpass or both proxy whose password is missing is left
+        out entirely; the count of emitted and skipped rows is returned in X-Export-Rows and
+        X-Export-Skipped.
       parameters:
         - name: format
           in: query
@@ -130,6 +140,16 @@ paths:
       responses:
         "200":
           description: one proxy per line as host:port:user:pass
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+            X-Export-Rows:
+              schema:
+                type: integer
+            X-Export-Skipped:
+              schema:
+                type: integer
           content:
             text/plain:
               schema:
@@ -170,7 +190,7 @@ paths:
         "409":
           $ref: "#/components/responses/OpInProgress"
         "429":
-          $ref: "#/components/responses/Error"
+          $ref: "#/components/responses/RateLimited"
 
   /api/v1/proxies/{proxy_id}/auth:
     post:
@@ -271,6 +291,8 @@ paths:
                 $ref: "#/components/schemas/OperationAccepted"
         "400":
           $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/OpInProgress"
 
   /api/v1/proxies/{proxy_id}/enable:
     post:
@@ -734,7 +756,14 @@ paths:
       operationId: events
       description: >-
         Server-sent events. No replay: the stream opens with a hello event and the client
-        refetches its queries on every reconnect. nginx must disable proxy buffering.
+        refetches its queries on every reconnect. nginx must disable proxy buffering and the
+        response carries X-Accel-Buffering no.
+        Frame names are hello, proxy.patch, dongle.patch, op.update, op.done, sms.received and
+        system.notice, plus a transport level ping every 25s carrying PingEvent. The ping is what
+        turns a half open TCP connection into a real EventSource error instead of a farm that
+        merely looks quiet. When the session cookie expires mid stream the server writes an SSE
+        comment and closes; the browser reconnects, is answered 401, and the panel falls back to
+        its sign in screen.
       parameters:
         - name: topics
           in: query
@@ -784,7 +813,7 @@ paths:
         "409":
           $ref: "#/components/responses/OpInProgress"
         "429":
-          $ref: "#/components/responses/Error"
+          $ref: "#/components/responses/RateLimited"
 
   /api/v1/status/{proxy_id}:
     get:
@@ -843,7 +872,7 @@ paths:
         "409":
           $ref: "#/components/responses/OpInProgress"
         "429":
-          $ref: "#/components/responses/Error"
+          $ref: "#/components/responses/RateLimited"
 
 components:
   securitySchemes:
@@ -854,6 +883,15 @@ components:
       type: apiKey
       in: cookie
       name: __Host-dongled_session
+      description: >-
+        SameSite=Strict, HttpOnly, Secure. Every request that is not GET, HEAD or OPTIONS must
+        also carry the header X-CSRF-Token holding Session.csrf_token. POST /auth/login is exempt
+        because no session exists yet, and POST /auth/logout is exempt because a forged sign out
+        is not worth breaking a client that has not yet read its session.
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
 
   parameters:
     ProxyID:
@@ -888,14 +926,63 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/OpInProgress"
+    RateLimited:
+      description: >-
+        rate limited. Retry-After and Error.retry_after always carry the same number of seconds,
+        so a client may read either. Per key limits also set the X-RateLimit headers; the per proxy
+        minimum rotation interval does not, because it is a product policy rather than a quota.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
 
   schemas:
+    ErrorCode:
+      type: string
+      description: >-
+        Stable machine readable reason. sim_pin_required is what a client matches to tell the
+        operator to unlock the SIM; rate_limited always comes with Retry-After; op_in_progress
+        always comes with operation_id.
+      enum:
+        - unauthorized
+        - invalid_credentials
+        - csrf_invalid
+        - forbidden
+        - scope_missing
+        - key_revoked
+        - not_found
+        - invalid_request
+        - op_in_progress
+        - conflict
+        - rate_limited
+        - sim_pin_required
+        - device_unreachable
+        - degraded
+        - proxy_expired
+        - not_implemented
+        - method_not_allowed
+        - timeout
+        - internal
+
     Error:
       type: object
       required: [error, message]
       properties:
         error:
-          type: string
+          $ref: "#/components/schemas/ErrorCode"
         message:
           type: string
         request_id:
@@ -963,6 +1050,7 @@ components:
           type: integer
         csrf_token:
           type: string
+          description: send this verbatim as X-CSRF-Token on every request that is not GET, HEAD or OPTIONS
 
     PortRange:
       type: object
@@ -1024,6 +1112,49 @@ components:
       type: integer
       enum: [900, 901, 902, 903]
 
+    SimState:
+      type: integer
+      description: >-
+        255 no SIM, 256 CPIN error, 257 ready, 258 PIN disabled, 259 PIN checking, 260 PIN
+        required, 261 PUK required. Mirrors device.SimState; 259, 260 and 261 mean locked.
+      enum: [255, 256, 257, 258, 259, 260, 261]
+
+    Scope:
+      type: string
+      description: >-
+        Permission carried by an API key. rotate allows POST /api/v1/rotate/{proxy_id} and a
+        rotate link; status allows GET /api/v1/status/{proxy_id}. Sent as plain strings in
+        ApiKeyRequest.scopes so a future scope does not break an older client at compile time.
+      enum: [rotate, status]
+
+    OpStep:
+      type: string
+      description: >-
+        Every step name any operation kind can report in Operation.step. Rotate walks precheck,
+        fence, data_off, hold, data_on, wait_connect, unfence, verify, done. Reboot walks precheck,
+        reboot, wait_down, wait_up, data_on, verify, done. set_net_mode walks precheck, data_off,
+        wait_disconnect, set_mode, data_on, wait_connect, verify, done. set_lan_ip walks precheck,
+        write_netcfg, post_dhcp, re_discovering, verify, done. Operation.step stays a plain string
+        so a client renders an unknown step instead of failing on it.
+      enum:
+        - precheck
+        - fence
+        - data_off
+        - hold
+        - data_on
+        - wait_connect
+        - unfence
+        - verify
+        - done
+        - reboot
+        - wait_down
+        - wait_up
+        - wait_disconnect
+        - set_mode
+        - write_netcfg
+        - post_dhcp
+        - re_discovering
+
     AuthIP:
       type: object
       required: [id, cidr, created_at]
@@ -1076,6 +1207,10 @@ components:
           type: string
         password:
           type: string
+          description: >-
+            Returned in full whenever auth_mode uses credentials, because the operator has to hand
+            it to the customer and the export endpoint is built on it. Stored encrypted at rest,
+            absent when auth_mode is iplist.
         auth_mode:
           $ref: "#/components/schemas/AuthMode"
         auth_ip_count:
@@ -1185,6 +1320,12 @@ components:
           type: boolean
         http_ok:
           type: boolean
+        egress_ok:
+          type: boolean
+          description: >-
+            Server computed: the probe left through the dongle and not through the host uplink.
+            The server knows node.PublicHost, a client comparing egress_ip against Proxy.wan_ip
+            does not.
         egress_ip:
           type: string
         latency_ms:
@@ -1204,6 +1345,9 @@ components:
           type: string
         usb_path:
           type: string
+          description: >-
+            Always populated. It is the only handle an operator has for the manual usbreset
+            fallback when lan_ip_change_supported is false.
         id_path:
           type: string
         occupied:
@@ -1250,7 +1394,7 @@ components:
         conn_status:
           $ref: "#/components/schemas/ConnStatus"
         sim_state:
-          type: integer
+          $ref: "#/components/schemas/SimState"
         net_mode:
           $ref: "#/components/schemas/NetMode"
         wan_ip:
@@ -1269,6 +1413,9 @@ components:
           type: boolean
         observed_at:
           type: integer
+        active_operation_id:
+          type: string
+          nullable: true
 
     DongleList:
       type: object
@@ -1444,13 +1591,53 @@ components:
         error:
           type: string
         result:
-          type: object
-          additionalProperties: true
+          $ref: "#/components/schemas/OperationResult"
         trigger:
           $ref: "#/components/schemas/Trigger"
         actor_type:
           type: string
         request_id:
+          type: string
+
+    OperationResult:
+      type: object
+      description: >-
+        Terminal payload of an operation, shaped by its kind. A rotate carries result, ip_changed,
+        old_ip, new_ip, duration_ms, attempts, hold_ms and conns_killed; old_public_ip and
+        new_public_ip are the same two addresses under the names the rotations table uses and are
+        emitted alongside them. reboot and set_net_mode carry duration_ms and the state they
+        settled on; set_lan_ip carries the gateway and whether the dongle supported the change;
+        selftest carries the SelftestResult fields. Additional properties stay open so a new
+        operation kind does not break an older client.
+      additionalProperties: true
+      properties:
+        result:
+          $ref: "#/components/schemas/RotationResult"
+        ip_changed:
+          type: boolean
+        old_ip:
+          type: string
+        new_ip:
+          type: string
+        old_public_ip:
+          type: string
+        new_public_ip:
+          type: string
+        duration_ms:
+          type: integer
+        attempts:
+          type: integer
+        hold_ms:
+          type: integer
+        conns_killed:
+          type: integer
+        reason:
+          type: string
+        note:
+          type: string
+        reboot_operation_id:
+          type: string
+        error:
           type: string
 
     OperationList:
@@ -1640,6 +1827,7 @@ components:
           type: string
         scopes:
           type: array
+          description: at least one Scope; the server rejects any value outside that enum
           items:
             type: string
         proxy_ids:
@@ -1658,6 +1846,11 @@ components:
 
     LinkToken:
       type: object
+      description: >-
+        Handle for revoking a rotate link. The id is not the secret: the secret lives only in
+        LinkTokenCreated.url, is shown exactly once, and is stored hashed. A link token is revoked
+        independently of the api key that issued it, so a URL pasted into a chat can be killed
+        without rotating the key.
       required: [id, api_key_id, created_at]
       properties:
         id:
@@ -1719,6 +1912,13 @@ components:
         is_fragment:
           type: boolean
         sent_at:
+          type: integer
+
+    PingEvent:
+      type: object
+      required: [server_time]
+      properties:
+        server_time:
           type: integer
 
     NoticeEvent:

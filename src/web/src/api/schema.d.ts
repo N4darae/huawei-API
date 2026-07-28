@@ -122,8 +122,9 @@ export type webhooks = Record<string, never>;
 
 export interface components {
   schemas: {
+    ErrorCode: "unauthorized" | "invalid_credentials" | "csrf_invalid" | "forbidden" | "scope_missing" | "key_revoked" | "not_found" | "invalid_request" | "op_in_progress" | "conflict" | "rate_limited" | "sim_pin_required" | "device_unreachable" | "degraded" | "proxy_expired" | "not_implemented" | "method_not_allowed" | "timeout" | "internal";
     Error: {
-      "error": string;
+      "error": components["schemas"]["ErrorCode"];
       "message": string;
       "request_id"?: string;
       "retry_after"?: number;
@@ -173,6 +174,9 @@ export interface components {
     NetMode: "auto" | "2g" | "3g" | "lte";
     SmsBox: 1 | 2 | 3;
     ConnStatus: 900 | 901 | 902 | 903;
+    SimState: 255 | 256 | 257 | 258 | 259 | 260 | 261;
+    Scope: "rotate" | "status";
+    OpStep: "precheck" | "fence" | "data_off" | "hold" | "data_on" | "wait_connect" | "unfence" | "verify" | "done" | "reboot" | "wait_down" | "wait_up" | "wait_disconnect" | "set_mode" | "write_netcfg" | "post_dhcp" | "re_discovering";
     AuthIP: {
       "id": string;
       "cidr": string;
@@ -242,6 +246,7 @@ export interface components {
     SelftestResult: {
       "socks_ok": boolean;
       "http_ok": boolean;
+      "egress_ok"?: boolean;
       "egress_ip"?: string;
       "latency_ms"?: number;
       "error"?: string;
@@ -271,7 +276,7 @@ export interface components {
       "carrier"?: string;
       "slot": number;
       "conn_status": components["schemas"]["ConnStatus"];
-      "sim_state"?: number;
+      "sim_state"?: components["schemas"]["SimState"];
       "net_mode"?: components["schemas"]["NetMode"];
       "wan_ip"?: string;
       "lan_ip_change_supported"?: boolean;
@@ -281,6 +286,7 @@ export interface components {
       "cap_reset_day"?: number;
       "reachable"?: boolean;
       "observed_at"?: number;
+      "active_operation_id"?: (string) | null;
     };
     DongleList: {
       "items": components["schemas"]["Dongle"][];
@@ -359,10 +365,27 @@ export interface components {
       "deadline_at": number;
       "finished_at"?: (number) | null;
       "error"?: string;
-      "result"?: { [key: string]: unknown };
+      "result"?: components["schemas"]["OperationResult"];
       "trigger": components["schemas"]["Trigger"];
       "actor_type"?: string;
       "request_id"?: string;
+    };
+    OperationResult: {
+      "result"?: components["schemas"]["RotationResult"];
+      "ip_changed"?: boolean;
+      "old_ip"?: string;
+      "new_ip"?: string;
+      "old_public_ip"?: string;
+      "new_public_ip"?: string;
+      "duration_ms"?: number;
+      "attempts"?: number;
+      "hold_ms"?: number;
+      "conns_killed"?: number;
+      "reason"?: string;
+      "note"?: string;
+      "reboot_operation_id"?: string;
+      "error"?: string;
+      [key: string]: unknown;
     };
     OperationList: {
       "items": components["schemas"]["Operation"][];
@@ -475,6 +498,9 @@ export interface components {
       "preview"?: string;
       "is_fragment"?: boolean;
       "sent_at"?: number;
+    };
+    PingEvent: {
+      "server_time": number;
     };
     NoticeEvent: {
       "level": "info" | "warn" | "error";
@@ -1286,6 +1312,11 @@ export interface operations {
       400: {
         content: {
           "application/json": components["schemas"]["Error"];
+        };
+      };
+      409: {
+        content: {
+          "application/json": components["schemas"]["OpInProgress"];
         };
       };
     };
