@@ -13,6 +13,7 @@ import (
 
 	"github.com/n4darae/huawei-API/src/internal/auth"
 	"github.com/n4darae/huawei-API/src/internal/config"
+	"github.com/n4darae/huawei-API/src/internal/devops"
 	"github.com/n4darae/huawei-API/src/internal/domain"
 	"github.com/n4darae/huawei-API/src/internal/eventbus"
 )
@@ -55,6 +56,26 @@ func (a *API) publishDonglePatch(ctx context.Context, id string, fields map[stri
 
 func (a *API) publishOp(ctx context.Context, op domain.Operation, kind eventbus.EventType) {
 	a.publish(ctx, kind, op.ID, operationDTO(op))
+}
+
+func allEmittedSteps() []string {
+	out := []string{}
+	for _, s := range domain.RotateSteps() {
+		out = append(out, string(s))
+	}
+	seen := map[string]bool{}
+	for _, s := range out {
+		seen[s] = true
+	}
+	for _, group := range [][]string{devops.RebootSteps(), devops.NetModeSteps(), devops.LanIPSteps()} {
+		for _, s := range group {
+			if !seen[s] {
+				seen[s] = true
+				out = append(out, s)
+			}
+		}
+	}
+	return out
 }
 
 func parseTopics(raw string) []string {
