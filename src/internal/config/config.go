@@ -151,6 +151,7 @@ func (c *Config) BindFlags(fs *flag.FlagSet) {
 	fs.StringVar(&c.PanelAddr, "panel-addr", c.PanelAddr, "panel listen address")
 	fs.StringVar(&c.MetricsAddr, "metrics-addr", c.MetricsAddr, "metrics listen address")
 	fs.StringVar(&c.DBPath, "db", c.DBPath, "sqlite database path")
+	fs.StringVar(&c.EtcDir, "etc-dir", c.EtcDir, "configuration directory holding kek.cred")
 	fs.StringVar(&c.Bin3proxy, "3proxy-bin", c.Bin3proxy, "pinned 3proxy binary path")
 	fs.StringVar(&c.LogLevel, "log-level", c.LogLevel, "debug|info|warn|error")
 	fs.IntVar(&c.SimSlots, "sim-slots", c.SimSlots, "simulated dongle count when device backend is sim")
@@ -190,6 +191,9 @@ func (c *Config) ApplyEnv(lookup func(string) (string, bool)) error {
 	}
 	if v, ok := lookup("DONGLED_DB"); ok {
 		c.DBPath = v
+	}
+	if v, ok := lookup("DONGLED_ETC_DIR"); ok {
+		c.EtcDir = v
 	}
 	if v, ok := lookup("DONGLED_LOG_LEVEL"); ok {
 		c.LogLevel = v
