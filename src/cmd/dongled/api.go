@@ -49,7 +49,7 @@ func buildPanel(ctx context.Context, app *App) (httpapi.Mounter, error) {
 		log.Warn("no panel account exists yet, nobody can sign in; create one with " + config.Product + " passwd")
 	}
 
-	devices, closeDevices, err := buildDevices(cfg)
+	devices, closeDevices, err := buildDevicesFor(cfg, false)
 	if err != nil {
 		return nil, err
 	}

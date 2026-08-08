@@ -260,6 +260,10 @@ func buildFirewall(ctx context.Context, cfg config.Config) (fw.Firewall, error) 
 }
 
 func buildDevices(cfg config.Config) (device.Registry, func(), error) {
+	return buildDevicesFor(cfg, true)
+}
+
+func buildDevicesFor(cfg config.Config, factoryDefaultLAN bool) (device.Registry, func(), error) {
 	switch cfg.Device {
 	case config.BackendHiLink:
 		r := hilink.NewRegistry(hilink.RegistryOptions{
@@ -267,7 +271,7 @@ func buildDevices(cfg config.Config) (device.Registry, func(), error) {
 		})
 		return r, func() { r.Close() }, nil
 	case config.BackendSim:
-		farm := sim.NewFarm(cfg.SimSlots, sim.FarmOptions{FactoryDefaultLAN: true})
+		farm := sim.NewFarm(cfg.SimSlots, sim.FarmOptions{FactoryDefaultLAN: factoryDefaultLAN})
 		return farm.Registry(), func() { farm.Close() }, nil
 	default:
 		return nil, nil, fmt.Errorf("%w: device %q", config.ErrBadBackend, string(cfg.Device))
