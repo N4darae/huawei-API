@@ -183,8 +183,10 @@ Regenerate with `make gen`. `make check` fails if the committed output is stale.
 make build          go build into bin/dongled
 make test           go test ./...
 make lint           gofmt, go vet, and the forbidden-pattern greps
+make cross-build    go build for linux, windows and darwin
+make cross-vet      go vet for linux, windows and darwin
 make gen            regenerate schema.d.ts and events.ts
-make check          lint + gen + test + fail on stale generated files
+make check          lint + gen + test + cross-build/cross-vet linux, windows, darwin + fail on stale generated files
 make web-install    npm install in web/
 make web            build the SPA into internal/webui/dist
 make web-reset      drop built assets and restore the committed dist placeholder
@@ -196,3 +198,44 @@ That is expected. Do not commit build output; run `make web-reset` before commit
 A clean checkout must satisfy `git clean -xdf && go build ./... && go vet ./...`. That is why
 `internal/webui/dist/index.html` is committed: `//go:embed` is compile-time and a missing directory
 breaks the whole module.
+
+---
+
+## 8. BUILD TAGS — production is Linux, development is not
+
+`dongled` only ever runs as a farm or panel host on Linux. But the whole tree must also `go build`,
+`go vet` and `go test` clean for `GOOS=windows` and `GOOS=darwin`, because Windows and macOS are
+supported **development** hosts. `make check` cross-builds and cross-vets all three; a file that
+breaks the contract fails the build, not just a code review.
+
+There are two independent axes. Pick the narrower one — do not reach for `unix` when `linux` is
+correct, and do not reach for `linux` when `unix` would do.
+
+### 8.1 `linux` / `!linux` — things only a Linux kernel has
+
+Netlink and rtnetlink sockets, network namespaces, sysfs, USBDEVFS ioctls, `uname`: anything that
+needs the Linux kernel specifically, not just a POSIX environment. See `internal/fw/netlink_linux.go`
+and `netlink_other.go`.
+
+The `_linux.go` file needs no `//go:build` line — `linux` is a real `GOOS` value, so the filename
+suffix alone is the constraint, and a redundant tag would just be a comment. The negative file cannot
+rely on a suffix (`other` is not a `GOOS`), so it carries `//go:build !linux` and returns
+`domain.UnsupportedOn("whatever the facility is")` — never a silent fake, never a value that only
+looks reasonable.
+
+### 8.2 `unix` / `!unix` — things every unix has but Windows does not
+
+POSIX file mode bits, `syscall.Stat_t`, `os.Getgroups`, `SIGUSR1`: real everywhere except Windows. See
+`internal/secrets/kek_permissions_unix.go` and `kek_permissions_other.go`.
+
+Unlike `linux`, `unix` is not a `GOOS` value, so **both** files need an explicit tag: `//go:build unix`
+and `//go:build !unix`. Forgetting the first one is caught by nothing but a Windows build; forgetting
+the second one is caught by nothing but a Linux build. Cross-building both is why `make check` runs
+`cross-build`/`cross-vet` on every call.
+
+### 8.3 ABI constants are written out as plain numbers, never `syscall.X`
+
+`AF_INET6` is `10` on Linux and `23` on Windows. `syscall.AF_INET6` resolves to whichever one matches
+the host the code is compiled on, which is the wrong value for a wire format or a netlink request that
+is only ever sent on Linux. Write the Linux ABI number literally in the `linux`-tagged file, the same
+way `internal/fw/sockdestroy.go` does, instead of borrowing a host constant that happens to compile.

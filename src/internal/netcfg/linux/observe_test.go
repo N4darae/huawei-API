@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"net/netip"
+	"runtime"
 	"testing"
 
 	"github.com/n4darae/huawei-API/src/internal/netcfg"
@@ -127,6 +128,9 @@ func TestFormatRule(t *testing.T) {
 }
 
 func TestLinkAndRuleDumpsWorkAgainstTheRunningKernel(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("rtnetlink dumps need a linux kernel")
+	}
 	o := NewObserver(nil)
 	ctx := context.Background()
 	links, err := o.Links(ctx)

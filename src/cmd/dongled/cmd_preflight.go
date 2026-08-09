@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"net/netip"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/n4darae/huawei-API/src/internal/config"
+	"github.com/n4darae/huawei-API/src/internal/domain"
 	"github.com/n4darae/huawei-API/src/internal/enroll"
 )
 
@@ -36,6 +38,9 @@ func (c *preflightCmd) flags(fs *flag.FlagSet) {
 }
 
 func (c *preflightCmd) run(ctx context.Context, cfg config.Config, args []string) error {
+	if runtime.GOOS != "linux" {
+		return domain.UnsupportedOn("preflight")
+	}
 	if err := rejectArgs("preflight", args); err != nil {
 		return err
 	}

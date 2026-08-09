@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/n4darae/huawei-API/src/internal/netcfg"
@@ -60,7 +58,39 @@ const (
 	rtmGetRule = 0x22
 
 	rtnlGroupLink = 1
+
+	rtmNewLink  = 16
+	rtmDelLink  = 17
+	rtmGetLink  = 18
+	rtmNewAddr  = 20
+	rtmGetAddr  = 22
+	rtmNewRoute = 24
+	rtmGetRoute = 26
+
+	nlmsgError = 0x2
+	nlmsgDone  = 0x3
+
+	nlmFRequest = 0x001
+	nlmFDump    = 0x300
+
+	sizeofNlMsgHdr = 16
+
+	afUnspec = 0
+	afInet6  = 10
 )
+
+type nlMsg struct {
+	Header nlMsgHdr
+	Data   []byte
+}
+
+type nlMsgHdr struct {
+	Len   uint32
+	Type  uint16
+	Flags uint16
+	Seq   uint32
+	Pid   uint32
+}
 
 var operStateNames = map[uint8]string{
 	0: netcfg.OperStateUnknown,
@@ -137,68 +167,6 @@ func attrMAC(a attr) string {
 	return strings.Join(parts, ":")
 }
 
-func dump(proto uint16, payload []byte) ([]syscall.NetlinkMessage, error) {
-	fd, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW|syscall.SOCK_CLOEXEC, syscall.NETLINK_ROUTE)
-	if err != nil {
-		return nil, err
-	}
-	defer syscall.Close(fd)
-	lsa := &syscall.SockaddrNetlink{Family: syscall.AF_NETLINK}
-	if err := syscall.Bind(fd, lsa); err != nil {
-		return nil, err
-	}
-	req := make([]byte, syscall.NLMSG_HDRLEN+len(payload))
-	binary.NativeEndian.PutUint32(req[0:4], uint32(len(req)))
-	binary.NativeEndian.PutUint16(req[4:6], proto)
-	binary.NativeEndian.PutUint16(req[6:8], syscall.NLM_F_REQUEST|syscall.NLM_F_DUMP)
-	binary.NativeEndian.PutUint32(req[8:12], 1)
-	copy(req[syscall.NLMSG_HDRLEN:], payload)
-	if err := syscall.Sendto(fd, req, 0, lsa); err != nil {
-		return nil, err
-	}
-	var out []syscall.NetlinkMessage
-	for {
-		buf := make([]byte, 1<<17)
-		n, _, err := syscall.Recvfrom(fd, buf, 0)
-		if err != nil {
-			return nil, err
-		}
-		if n < syscall.NLMSG_HDRLEN {
-			return nil, netcfg.ErrMalformedNetlink
-		}
-		msgs, err := syscall.ParseNetlinkMessage(buf[:n])
-		if err != nil {
-			return nil, err
-		}
-		done := false
-		for _, m := range msgs {
-			switch m.Header.Type {
-			case syscall.NLMSG_DONE:
-				done = true
-			case syscall.NLMSG_ERROR:
-				return nil, netlinkError(m.Data)
-			default:
-				out = append(out, m)
-			}
-		}
-		if done {
-			break
-		}
-	}
-	return out, nil
-}
-
-func netlinkError(data []byte) error {
-	if len(data) < 4 {
-		return netcfg.ErrMalformedNetlink
-	}
-	code := int32(binary.NativeEndian.Uint32(data[0:4]))
-	if code == 0 {
-		return nil
-	}
-	return syscall.Errno(-code)
-}
-
 type Observer struct {
 	Exec     netcfg.Exec
 	ProcRoot string
@@ -214,15 +182,15 @@ func NewObserver(e netcfg.Exec) *Observer {
 
 func (o *Observer) Links(ctx context.Context) (map[string]netcfg.LinkState, error) {
 	payload := make([]byte, sizeofIfInfomsg)
-	payload[0] = syscall.AF_UNSPEC
-	msgs, err := dump(syscall.RTM_GETLINK, payload)
+	payload[0] = afUnspec
+	msgs, err := dump(rtmGetLink, payload)
 	if err != nil {
 		return nil, err
 	}
 	byIndex := map[int]string{}
 	links := map[string]netcfg.LinkState{}
 	for _, m := range msgs {
-		if m.Header.Type != syscall.RTM_NEWLINK || len(m.Data) < sizeofIfInfomsg {
+		if m.Header.Type != rtmNewLink || len(m.Data) < sizeofIfInfomsg {
 			continue
 		}
 		index := int(int32(binary.NativeEndian.Uint32(m.Data[4:8])))
@@ -281,14 +249,14 @@ func (o *Observer) Links(ctx context.Context) (map[string]netcfg.LinkState, erro
 
 func (o *Observer) addrs(ctx context.Context) (map[int][]netip.Prefix, error) {
 	payload := make([]byte, sizeofIfAddrmsg)
-	payload[0] = syscall.AF_UNSPEC
-	msgs, err := dump(syscall.RTM_GETADDR, payload)
+	payload[0] = afUnspec
+	msgs, err := dump(rtmGetAddr, payload)
 	if err != nil {
 		return nil, err
 	}
 	out := map[int][]netip.Prefix{}
 	for _, m := range msgs {
-		if m.Header.Type != syscall.RTM_NEWADDR || len(m.Data) < sizeofIfAddrmsg {
+		if m.Header.Type != rtmNewAddr || len(m.Data) < sizeofIfAddrmsg {
 			continue
 		}
 		prefixLen := int(m.Data[1])
@@ -336,7 +304,7 @@ func (o *Observer) idPath(ctx context.Context, iface string) string {
 
 func (o *Observer) Rules(ctx context.Context) ([]netcfg.RuleState, error) {
 	payload := make([]byte, sizeofFibRuleHdr)
-	payload[0] = syscall.AF_UNSPEC
+	payload[0] = afUnspec
 	msgs, err := dump(rtmGetRule, payload)
 	if err != nil {
 		return nil, err
@@ -426,8 +394,8 @@ func tableName(t int) string {
 
 func (o *Observer) Routes(ctx context.Context) (map[int][]netcfg.RouteState, error) {
 	payload := make([]byte, sizeofRtMsg)
-	payload[0] = syscall.AF_UNSPEC
-	msgs, err := dump(syscall.RTM_GETROUTE, payload)
+	payload[0] = afUnspec
+	msgs, err := dump(rtmGetRoute, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -437,7 +405,7 @@ func (o *Observer) Routes(ctx context.Context) (map[int][]netcfg.RouteState, err
 	}
 	out := map[int][]netcfg.RouteState{}
 	for _, m := range msgs {
-		if m.Header.Type != syscall.RTM_NEWROUTE || len(m.Data) < sizeofRtMsg {
+		if m.Header.Type != rtmNewRoute || len(m.Data) < sizeofRtMsg {
 			continue
 		}
 		family := m.Data[0]
@@ -475,7 +443,7 @@ func (o *Observer) Routes(ctx context.Context) (map[int][]netcfg.RouteState, err
 		}
 		if !r.Dst.IsValid() {
 			zero := netip.IPv4Unspecified()
-			if family == syscall.AF_INET6 {
+			if family == afInet6 {
 				zero = netip.IPv6Unspecified()
 			}
 			r.Dst = netip.PrefixFrom(zero, 0)
@@ -504,14 +472,14 @@ func scopeName(s uint8) string {
 
 func (o *Observer) linkNames(ctx context.Context) (map[int]string, error) {
 	payload := make([]byte, sizeofIfInfomsg)
-	payload[0] = syscall.AF_UNSPEC
-	msgs, err := dump(syscall.RTM_GETLINK, payload)
+	payload[0] = afUnspec
+	msgs, err := dump(rtmGetLink, payload)
 	if err != nil {
 		return nil, err
 	}
 	out := map[int]string{}
 	for _, m := range msgs {
-		if m.Header.Type != syscall.RTM_NEWLINK || len(m.Data) < sizeofIfInfomsg {
+		if m.Header.Type != rtmNewLink || len(m.Data) < sizeofIfInfomsg {
 			continue
 		}
 		index := int(int32(binary.NativeEndian.Uint32(m.Data[4:8])))
@@ -588,69 +556,12 @@ func sortPrefixes(p []netip.Prefix) {
 	}
 }
 
-type subscription struct {
-	fd      int
-	ch      chan netcfg.LinkEvent
-	stopped atomic.Bool
-}
-
-func (o *Observer) Subscribe(ctx context.Context) (<-chan netcfg.LinkEvent, func(), error) {
-	fd, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW|syscall.SOCK_CLOEXEC, syscall.NETLINK_ROUTE)
-	if err != nil {
-		return nil, nil, err
-	}
-	lsa := &syscall.SockaddrNetlink{Family: syscall.AF_NETLINK, Groups: rtnlGroupLink}
-	if err := syscall.Bind(fd, lsa); err != nil {
-		syscall.Close(fd)
-		return nil, nil, err
-	}
-	tv := syscall.Timeval{Sec: 0, Usec: 400000}
-	if err := syscall.SetsockoptTimeval(fd, syscall.SOL_SOCKET, syscall.SO_RCVTIMEO, &tv); err != nil {
-		syscall.Close(fd)
-		return nil, nil, err
-	}
-	s := &subscription{fd: fd, ch: make(chan netcfg.LinkEvent, 64)}
-	go func() {
-		defer close(s.ch)
-		defer syscall.Close(fd)
-		seen := map[int]struct{}{}
-		for {
-			if s.stopped.Load() || ctx.Err() != nil {
-				return
-			}
-			buf := make([]byte, 1<<16)
-			n, _, err := syscall.Recvfrom(fd, buf, 0)
-			if err != nil {
-				if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK || err == syscall.EINTR {
-					continue
-				}
-				return
-			}
-			msgs, err := syscall.ParseNetlinkMessage(buf[:n])
-			if err != nil {
-				continue
-			}
-			for _, m := range msgs {
-				ev, ok := decodeLinkEvent(m, seen)
-				if !ok {
-					continue
-				}
-				select {
-				case s.ch <- ev:
-				default:
-				}
-			}
-		}
-	}()
-	return s.ch, func() { s.stopped.Store(true) }, nil
-}
-
-func decodeLinkEvent(m syscall.NetlinkMessage, seen map[int]struct{}) (netcfg.LinkEvent, bool) {
+func decodeLinkEvent(m nlMsg, seen map[int]struct{}) (netcfg.LinkEvent, bool) {
 	var kind netcfg.LinkEventKind
 	switch m.Header.Type {
-	case syscall.RTM_NEWLINK:
+	case rtmNewLink:
 		kind = netcfg.LinkAdded
-	case syscall.RTM_DELLINK:
+	case rtmDelLink:
 		kind = netcfg.LinkDeleted
 	default:
 		return netcfg.LinkEvent{}, false

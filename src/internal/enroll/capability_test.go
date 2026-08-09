@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -109,6 +110,9 @@ func byName(r Report, name string) Check {
 }
 
 func TestPreflightIsGreenOnAFullyPreparedHost(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the executable bit checkBinary reads does not exist in a windows os.FileMode")
+	}
 	r := Preflight(context.Background(), greenOptions(t))
 	if len(r) != 14 {
 		t.Fatalf("preflight produced %d checks, want 14:\n%s", len(r), r.Text())
@@ -122,6 +126,9 @@ func TestPreflightIsGreenOnAFullyPreparedHost(t *testing.T) {
 }
 
 func TestPreflightTurnsRedOnExactlyTheBrokenItem(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the executable bit checkBinary reads does not exist in a windows os.FileMode")
+	}
 	cases := []struct {
 		name    string
 		check   string
@@ -356,7 +363,11 @@ func deployFile(t *testing.T, rel string) string {
 }
 
 func TestDeployedProxyUnitIsExactlyWhatTheSupervisorRenders(t *testing.T) {
-	want := proxysup.RenderUnit(proxysup.UnitOptions{})
+	want := proxysup.RenderUnit(proxysup.UnitOptions{
+		Bin:     "/usr/local/lib/dongled/3proxy",
+		ConfDir: "/etc/dongled/proxy",
+		LogDir:  "/var/log/dongled",
+	})
 	got := deployFile(t, "dongled-proxy@.service")
 	if !bytes.Equal([]byte(got), want) {
 		t.Fatalf("deploy/dongled-proxy@.service has drifted from proxysup.RenderUnit; regenerate it instead of hand editing\n--- on disk ---\n%s\n--- rendered ---\n%s", got, want)

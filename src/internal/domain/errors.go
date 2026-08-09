@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"sort"
 	"strconv"
 )
@@ -21,7 +22,13 @@ var (
 	ErrNoFreeSlot     = errors.New("dongled: no free slot")
 	ErrSimLocked      = errors.New("dongled: sim locked, PIN or PUK required")
 	ErrDegraded       = errors.New("dongled: degraded, refusing to act")
+
+	ErrUnsupportedPlatform = errors.New("dongled: unsupported on this platform")
 )
+
+func UnsupportedOn(op string) error {
+	return fmt.Errorf("%w: %s requires linux, this is %s", ErrUnsupportedPlatform, op, runtime.GOOS)
+}
 
 type HiLinkCode int
 

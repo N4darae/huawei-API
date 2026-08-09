@@ -3,24 +3,6 @@ package config
 const (
 	Product = "dongled"
 
-	EtcDir       = "/etc/" + Product
-	RunDir       = "/run/" + Product
-	StateDir     = "/var/lib/" + Product
-	LogDir       = "/var/log/" + Product
-	BackupDir    = "/var/backups/" + Product
-	BinDir       = "/usr/local/lib/" + Product
-	ProxyConfDir = EtcDir + "/proxy"
-
-	DBPath      = StateDir + "/" + Product + ".db"
-	Bin3proxy   = BinDir + "/3proxy"
-	FarmMarker  = EtcDir + "/FARM"
-	KEKCredFile = EtcDir + "/kek.cred"
-	KEKCredName = "kek"
-
-	NetworkDir   = "/etc/systemd/network"
-	RtTablesDir  = "/etc/iproute2/rt_tables.d"
-	RtTablesFile = RtTablesDir + "/" + Product + ".conf"
-
 	NftFamily = "inet"
 	NftTable  = Product
 
@@ -34,6 +16,17 @@ const (
 	UnitProxyTpl = Product + "-proxy@.service"
 
 	Pin3proxyCommit = "122ca26249aaaac9156e0805891555c70e19f2b3"
+
+	KEKCredName = "kek"
+)
+
+var (
+	ProxyConfDir = EtcDir + "/proxy"
+
+	DBPath      = StateDir + "/" + Product + ".db"
+	Bin3proxy   = BinDir + "/3proxy"
+	FarmMarker  = EtcDir + "/FARM"
+	KEKCredFile = EtcDir + "/kek.cred"
 )
 
 func ProxyUnit(user string) string {

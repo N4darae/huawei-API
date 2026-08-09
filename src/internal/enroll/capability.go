@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -14,7 +13,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/n4darae/huawei-API/src/internal/config"
@@ -654,21 +652,6 @@ func addrOfLine(line string) (netip.Addr, bool) {
 	return netip.Addr{}, false
 }
 
-func KernelRelease() (string, error) {
-	var u syscall.Utsname
-	if err := syscall.Uname(&u); err != nil {
-		return "", err
-	}
-	b := make([]byte, 0, len(u.Release))
-	for _, c := range u.Release {
-		if c == 0 {
-			break
-		}
-		b = append(b, byte(c))
-	}
-	return string(b), nil
-}
-
 func ParseKernelRelease(s string) (int, int, error) {
 	s = strings.TrimSpace(s)
 	cut := strings.IndexFunc(s, func(r rune) bool {
@@ -767,77 +750,6 @@ func checkBackup(o PreflightOptions) Check {
 	c.OK = true
 	c.Detail = fmt.Sprintf("%s is %s old", path, age.Round(time.Minute))
 	return c
-}
-
-const (
-	netlinkNetfilter    = 12
-	nfnlSubsysCtnetlink = 1
-	ipctnlMsgCtGet      = 1
-	nfnetlinkV0         = 0
-)
-
-func CountConntrack() (int, error) {
-	fd, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW|syscall.SOCK_CLOEXEC, netlinkNetfilter)
-	if err != nil {
-		return 0, fmt.Errorf("socket(NETLINK_NETFILTER): %w", err)
-	}
-	defer syscall.Close(fd)
-	if err := syscall.Bind(fd, &syscall.SockaddrNetlink{Family: syscall.AF_NETLINK}); err != nil {
-		return 0, fmt.Errorf("bind(NETLINK_NETFILTER): %w", err)
-	}
-	tv := syscall.Timeval{Sec: 3}
-	if err := syscall.SetsockoptTimeval(fd, syscall.SOL_SOCKET, syscall.SO_RCVTIMEO, &tv); err != nil {
-		return 0, err
-	}
-
-	body := []byte{syscall.AF_INET, nfnetlinkV0, 0, 0}
-	msg := make([]byte, syscall.NLMSG_HDRLEN+len(body))
-	binary.NativeEndian.PutUint32(msg[0:4], uint32(len(msg)))
-	binary.NativeEndian.PutUint16(msg[4:6], nfnlSubsysCtnetlink<<8|ipctnlMsgCtGet)
-	binary.NativeEndian.PutUint16(msg[6:8], syscall.NLM_F_REQUEST|syscall.NLM_F_DUMP)
-	binary.NativeEndian.PutUint32(msg[8:12], 1)
-	copy(msg[syscall.NLMSG_HDRLEN:], body)
-
-	if err := syscall.Sendto(fd, msg, 0, &syscall.SockaddrNetlink{Family: syscall.AF_NETLINK}); err != nil {
-		return 0, fmt.Errorf("sendto(CTNETLINK dump): %w", err)
-	}
-
-	buf := make([]byte, 1<<17)
-	count := 0
-	for {
-		n, _, err := syscall.Recvfrom(fd, buf, 0)
-		if err != nil {
-			return count, fmt.Errorf("recvfrom(CTNETLINK dump): %w", err)
-		}
-		msgs, err := syscall.ParseNetlinkMessage(buf[:n])
-		if err != nil {
-			return count, err
-		}
-		for _, m := range msgs {
-			switch m.Header.Type {
-			case syscall.NLMSG_DONE:
-				return count, nil
-			case syscall.NLMSG_ERROR:
-				if e := netlinkErrno(m.Data); e != 0 {
-					return count, fmt.Errorf("CTNETLINK dump: %w", e)
-				}
-				return count, nil
-			default:
-				count++
-			}
-		}
-	}
-}
-
-func netlinkErrno(data []byte) syscall.Errno {
-	if len(data) < 4 {
-		return syscall.EINVAL
-	}
-	code := int32(binary.NativeEndian.Uint32(data[0:4]))
-	if code == 0 {
-		return 0
-	}
-	return syscall.Errno(-code)
 }
 
 type DeviceCapabilities struct {

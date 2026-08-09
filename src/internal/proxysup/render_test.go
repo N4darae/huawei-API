@@ -17,6 +17,8 @@ func testSpec(t *testing.T) Spec {
 	t.Helper()
 	sp := NewSpec(1, netip.MustParseAddr("139.99.68.39"), netip.MustParseAddr("1.1.1.1"))
 	sp.Users = []User{{Name: "cust_ab12cd34", Password: "Kq7mZr2xTn9wLb4V"}}
+	sp.LogPath = "/var/log/dongled/px01.log"
+	sp.ConfigPath = "/etc/dongled/proxy/px01.cfg"
 	return sp
 }
 
