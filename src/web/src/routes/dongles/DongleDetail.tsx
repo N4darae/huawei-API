@@ -67,7 +67,7 @@ export function DongleDetail({ dongleId }: { dongleId: string }) {
 
       <section className="card">
         <div className="row">
-          <h3 className="card-title grow">{dongle.id}</h3>
+          <h3 className="card-title">{dongle.id}</h3>
           <Badge tone={connTone(dongle.conn_status)}>{connStatusLabel(dongle.conn_status)}</Badge>
           <Badge tone={simTone(dongle.sim_state)}>SIM {simStateLabel(dongle.sim_state)}</Badge>
           {dongle.reachable === false ? <Badge tone="danger">unreachable</Badge> : null}

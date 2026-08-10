@@ -12,6 +12,7 @@ export function DonglesPage() {
 
   return (
     <div className="page">
+      <div className="page-col">
       <div className="page-head">
         <h1 className="page-title">Dongles</h1>
         <span className="muted">{items.length} sticks</span>
@@ -33,7 +34,7 @@ export function DonglesPage() {
                 onClick={() => setSelected(d.id)}
               >
                 <span className="row">
-                  <span className="mono grow">slot {d.slot}</span>
+                  <span className="mono">slot {d.slot}</span>
                   <Badge tone={connTone(d.conn_status)}>{connStatusLabel(d.conn_status)}</Badge>
                 </span>
                 <span className="faint mono">{d.id}</span>
@@ -43,10 +44,11 @@ export function DonglesPage() {
               </button>
             </li>
           ))}
-          {items.length === 0 && !list.isPending ? <li className="muted">No dongles enrolled.</li> : null}
+          {items.length === 0 && !list.isPending ? <li className="list-empty">No dongles enrolled.</li> : null}
         </ul>
 
         <div>{current ? <DongleDetail dongleId={current} /> : <span className="muted">Pick a dongle.</span>}</div>
+      </div>
       </div>
     </div>
   )

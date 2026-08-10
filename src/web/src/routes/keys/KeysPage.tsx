@@ -107,69 +107,70 @@ function KeyRow({ apiKey }: { apiKey: ApiKey }) {
   const [linkOnce, setLinkOnce] = useState<string | null>(null)
   const now = useNow(30_000)
   const revoked = apiKey.revoked_at != null
+  const tokens = apiKey.link_tokens ?? []
 
   return (
     <section className="card">
-      <div className="row">
-        <span className="grow col" style={{ gap: 0 }}>
+      <div className="row" style={{ alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <span className="identity" style={{ gap: 0 }}>
           <span style={{ fontWeight: 600 }}>{apiKey.name}</span>
-          <span className="faint mono">
-            {apiKey.prefix}… · created {formatClock(apiKey.created_at)} · last used{' '}
-            {formatAgo(apiKey.last_used_at, now)}
+          <span className="faint mono meta-line">
+            <span>{apiKey.prefix}…</span>
+            <span>·</span>
+            <span>created {formatClock(apiKey.created_at)}</span>
+            <span>·</span>
+            <span>last used {formatAgo(apiKey.last_used_at, now)}</span>
+            <span>·</span>
+            <span>{apiKey.scopes.join(' + ') || 'no scopes'}</span>
           </span>
         </span>
-        {revoked ? <Badge tone="danger">revoked</Badge> : <Badge tone="ok">active</Badge>}
-        {apiKey.scopes.map((s) => (
-          <Badge key={s} tone="info">
-            {s}
-          </Badge>
-        ))}
-        <Button
-          variant="danger"
-          disabled={revoked}
-          busy={revoke.isPending}
-          onClick={() => revoke.mutate(apiKey.id)}
-          aria-label={`Revoke key ${apiKey.name}`}
-        >
-          Revoke key
-        </Button>
+        <span className="row" style={{ flex: 'none' }}>
+          {revoked ? <Badge tone="danger">revoked</Badge> : <Badge tone="ok">active</Badge>}
+          <Button
+            variant="danger"
+            disabled={revoked}
+            busy={revoke.isPending}
+            onClick={() => revoke.mutate(apiKey.id)}
+            aria-label={`Revoke key ${apiKey.name}`}
+          >
+            Revoke key
+          </Button>
+        </span>
       </div>
 
       {apiKey.proxy_ids && apiKey.proxy_ids.length > 0 ? (
         <span className="faint mono">scoped to {apiKey.proxy_ids.join(', ')}</span>
       ) : null}
 
-      <div className="col">
-        <span className="field-label">Customer rotate links</span>
-        <ul className="list">
-          {(apiKey.link_tokens ?? []).map((t) => (
-            <li key={t.id} className="list-item" style={{ cursor: 'default' }}>
-              <div className="row">
-                <span className="mono grow">
-                  {LINK_BASE}/{t.id.slice(0, 6)}…
-                </span>
-                {t.revoked_at != null ? (
-                  <Badge tone="danger">revoked</Badge>
-                ) : (
-                  <Badge tone="ok">live</Badge>
-                )}
-                <span className="faint">created {formatClock(t.created_at)}</span>
-                <Button
-                  variant="danger"
-                  disabled={t.revoked_at != null}
-                  busy={revokeLink.isPending && revokeLink.variables === t.id}
-                  onClick={() => revokeLink.mutate(t.id)}
-                  aria-label={`Revoke link token ${t.id}`}
-                >
-                  Revoke link
-                </Button>
-              </div>
-            </li>
-          ))}
-          {(apiKey.link_tokens ?? []).length === 0 ? (
-            <li className="muted">No rotate link issued for this key.</li>
-          ) : null}
-        </ul>
+      <div className="col" style={{ gap: 6 }}>
+        {tokens.length > 0 ? (
+          <ul className="list">
+            {tokens.map((t) => (
+              <li key={t.id} className="list-item" style={{ cursor: 'default' }}>
+                <div className="row">
+                  <span className="mono">
+                    {LINK_BASE}/{t.id.slice(0, 6)}…
+                  </span>
+                  {t.revoked_at != null ? (
+                    <Badge tone="danger">revoked</Badge>
+                  ) : (
+                    <Badge tone="ok">live</Badge>
+                  )}
+                  <span className="faint">created {formatClock(t.created_at)}</span>
+                  <Button
+                    variant="danger"
+                    disabled={t.revoked_at != null}
+                    busy={revokeLink.isPending && revokeLink.variables === t.id}
+                    onClick={() => revokeLink.mutate(t.id)}
+                    aria-label={`Revoke link token ${t.id}`}
+                  >
+                    Revoke link
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : null}
 
         {linkOnce ? (
           <>
@@ -194,15 +195,13 @@ function KeyRow({ apiKey }: { apiKey: ApiKey }) {
           <Button
             busy={createLink.isPending}
             disabled={revoked}
+            title="A rotate link lets the customer self-serve a new IP without seeing the API key. It is created and revoked independently of the key."
             onClick={() =>
               createLink.mutate(apiKey.id, { onSuccess: (res) => setLinkOnce(res.url) })
             }
           >
             Create rotate link
           </Button>
-          <span className="muted">
-            Created and revoked independently of the key itself.
-          </span>
         </div>
       </div>
     </section>
@@ -215,6 +214,7 @@ export function KeysPage() {
 
   return (
     <div className="page">
+      <div className="page-col">
       <div className="page-head">
         <h1 className="page-title">API keys</h1>
         <span className="muted">{list.data?.items.length ?? 0} keys</span>
@@ -248,8 +248,9 @@ export function KeysPage() {
       ))}
 
       {list.data && list.data.items.length === 0 ? (
-        <span className="muted">No API keys yet.</span>
+        <div className="list-empty">No API keys yet.</div>
       ) : null}
+      </div>
     </div>
   )
 }

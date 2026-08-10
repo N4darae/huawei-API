@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import { Badge, Button, ToastProvider, applyTheme, readTheme, useToast } from './design'
-import type { ThemeChoice } from './design'
+import { Button, Dot, ToastProvider, applyTheme, readTheme, useToast } from './design'
+import type { ThemeChoice, Tone } from './design'
 import { createQueryClient, useHealth, useLogout, useNow } from './api/query'
 import { LiveProvider, useLive } from './api/sse'
+import type { LiveStatus } from './api/sse'
 import type { Topic } from './api/events'
 import { AuthGate } from './auth'
 import { Link, ROUTES, useRoutePath, useTitleSync } from './router'
@@ -15,54 +16,53 @@ import { formatAgo } from './routes/proxies/format'
 
 const TOPICS: Topic[] = ['proxies', 'dongles', 'operations', 'sms', 'system']
 
-function ConnBadge() {
-  const live = useLive()
-  const now = useNow(2000)
-  const age = live.lastEventAt == null ? null : formatAgo(live.lastEventAt, now)
-
-  const label =
-    live.status === 'live'
-      ? live.stale
-        ? 'live stream silent'
-        : 'live'
-      : live.status === 'reconnecting'
-        ? 'stream lost — reconnecting'
-        : live.status === 'connecting'
-          ? 'stream connecting'
-          : 'no stream — polling'
-
-  const tone = live.status === 'live' ? (live.stale ? 'warn' : 'ok') : 'warn'
-
-  return (
-    <span className="conn" title={live.nodeId ? `node ${live.nodeId}` : undefined}>
-      <Badge tone={tone}>{label}</Badge>
-      <span className="faint">{age ? `last event ${age}` : 'no events yet'}</span>
-    </span>
-  )
+function streamTone(status: LiveStatus, stale: boolean): Tone {
+  return status === 'live' && !stale ? 'ok' : 'warn'
 }
 
-function HealthBadge() {
+function streamLabel(status: LiveStatus, stale: boolean): string {
+  if (status === 'live') return stale ? 'live stream silent' : 'live'
+  if (status === 'reconnecting') return 'stream lost — reconnecting'
+  if (status === 'connecting') return 'stream connecting'
+  return 'no stream — polling'
+}
+
+function SidebarHealth() {
   const health = useHealth()
-  if (health.isError) return <Badge tone="danger">panel unreachable</Badge>
-  const h = health.data
-  if (!h) return null
-  const bad = h.invariants.filter((i) => !i.ok)
-  if (h.status === 'ok' && bad.length === 0) return <Badge tone="ok">invariants ok</Badge>
+  const live = useLive()
+  const now = useNow(2000)
+
+  const bad = health.data?.invariants.filter((i) => !i.ok) ?? []
+  const healthOk = !health.isError && health.data?.status === 'ok' && bad.length === 0
+  const healthLabel = health.isError
+    ? 'panel unreachable'
+    : bad.length > 0
+      ? `${bad.length} invariants failing`
+      : 'invariants ok'
+
+  const streamText = streamLabel(live.status, live.stale)
+  const age =
+    live.lastEventAt == null ? 'no events yet' : `last event ${formatAgo(live.lastEventAt, now)}`
+
+  const tone: Tone = !healthOk ? 'danger' : streamTone(live.status, live.stale)
+  const summary = healthOk ? streamText : healthLabel
+  const detail = [healthLabel, streamText, age].join(' · ')
+
   return (
-    <Badge tone="danger" title={bad.map((i) => `${i.name}: ${i.detail ?? 'failed'}`).join('\n')}>
-      {bad.length} invariants failing
-    </Badge>
+    <span className="sidebar-health" data-tone={tone} title={detail}>
+      <Dot tone={tone} filled label={detail} />
+      <span className="sidebar-health-text">{summary}</span>
+    </span>
   )
 }
 
 function ThemePicker() {
   const [choice, setChoice] = useState<ThemeChoice>(readTheme)
   return (
-    <label className="row" style={{ gap: 6 }}>
+    <label className="row" style={{ gap: 4 }}>
       <span className="sr-only">Theme</span>
       <select
-        className="field-input"
-        style={{ width: 'auto' }}
+        className="field-input theme-select"
         value={choice}
         onChange={(e) => {
           const v = e.target.value as ThemeChoice
@@ -84,25 +84,32 @@ export function Shell() {
   useTitleSync(path === '/' ? 'Proxies · dongled' : path === '/dongles' ? 'Dongles · dongled' : 'API keys · dongled')
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <span className="brand">dongled</span>
-        <nav className="nav" aria-label="Main">
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <span className="sidebar-mark" aria-hidden="true" />
+          dongled
+        </div>
+        <nav className="sidebar-nav" aria-label="Main">
           {ROUTES.map((r) => (
             <Link key={r.path} to={r.path}>
               {r.label}
             </Link>
           ))}
         </nav>
-        <span className="grow" />
-        <HealthBadge />
-        <ConnBadge />
-        <ThemePicker />
-        <Button busy={logout.isPending} onClick={() => logout.mutate()}>
-          Sign out
-        </Button>
-      </header>
-      {path === '/dongles' ? <DonglesPage /> : path === '/keys' ? <KeysPage /> : <ProxiesPage />}
+        <div className="sidebar-foot">
+          <SidebarHealth />
+          <div className="sidebar-foot-row">
+            <ThemePicker />
+            <Button variant="ghost" busy={logout.isPending} onClick={() => logout.mutate()}>
+              Sign out
+            </Button>
+          </div>
+        </div>
+      </aside>
+      <main className="main">
+        {path === '/dongles' ? <DonglesPage /> : path === '/keys' ? <KeysPage /> : <ProxiesPage />}
+      </main>
     </div>
   )
 }

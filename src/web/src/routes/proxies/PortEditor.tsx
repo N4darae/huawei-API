@@ -57,7 +57,7 @@ export function PortEditor({ proxy }: { proxy: Proxy }) {
             {ranges.map((r, i) => (
               <li key={`${r.lo}-${r.hi}`} className="list-item" style={{ cursor: 'default' }}>
                 <div className="row">
-                  <span className="mono grow">{r.lo === r.hi ? r.lo : `${r.lo}-${r.hi}`}</span>
+                  <span className="mono">{r.lo === r.hi ? r.lo : `${r.lo}-${r.hi}`}</span>
                   <Button
                     variant="danger"
                     onClick={() => setRanges(ranges.filter((_, j) => j !== i))}

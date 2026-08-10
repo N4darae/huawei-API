@@ -16,28 +16,34 @@ import {
 
 const STATES: ProxyState[] = ['active', 'suspended', 'disabled', 'expired', 'degraded', 'unknown']
 
-function PortsCell({ proxy }: { proxy: Proxy }) {
+function ProxyCell({ proxy }: { proxy: Proxy }) {
   const s = proxy.ports_bound.socks
   const h = proxy.ports_bound.http
   return (
-    <span className="row" style={{ gap: 10 }}>
-      <span className="row" style={{ gap: 4 }}>
-        <span className="mono">S</span>
+    <span className="col" style={{ gap: 0 }}>
+      <span className="row mono" style={{ gap: 4, flexWrap: 'nowrap' }}>
+        <span>
+          {proxy.host}:{proxy.socks_port}
+        </span>
         <Dot
           filled={s}
           tone={s ? 'ok' : 'danger'}
           label={s ? 'SOCKS listener observed bound' : 'SOCKS listener NOT bound'}
         />
       </span>
-      <span className="row" style={{ gap: 4 }}>
-        <span className="mono">H</span>
+      <span className="row faint mono" style={{ gap: 4, flexWrap: 'nowrap' }}>
+        <span>http {proxy.http_port}</span>
         <Dot
           filled={h}
           tone={h ? 'ok' : 'danger'}
           label={h ? 'HTTP listener observed bound' : 'HTTP listener NOT bound'}
         />
+        <span>· slot {proxy.slot}</span>
       </span>
-      {proxy.ports_bound.probe_ok === false ? <span className="faint">probe failed</span> : null}
+      <span className="faint mono">
+        {proxy.username}
+        {proxy.ports_bound.probe_ok === false ? ' · probe failed' : ''}
+      </span>
     </span>
   )
 }
@@ -122,28 +128,19 @@ export function ProxiesPage() {
     {
       key: 'status',
       header: 'Status',
-      width: '110px',
+      width: '96px',
       cell: (p) => <Badge tone={PROXY_STATE_TONE[p.state]}>{p.state}</Badge>,
     },
     {
       key: 'proxy',
       header: 'Proxy',
-      width: '250px',
-      cell: (p) => (
-        <span className="col" style={{ gap: 0 }}>
-          <span className="mono">
-            {p.host}:{p.socks_port}
-          </span>
-          <span className="faint mono">
-            slot {p.slot} · http {p.http_port} · {p.username}
-          </span>
-        </span>
-      ),
+      width: '230px',
+      cell: (p) => <ProxyCell proxy={p} />,
     },
     {
       key: 'customer',
       header: 'Customer',
-      width: '150px',
+      width: '120px',
       cell: (p) =>
         p.customer_name || p.customer_id ? (
           <span>{p.customer_name || p.customer_id}</span>
@@ -154,7 +151,7 @@ export function ProxiesPage() {
     {
       key: 'expires',
       header: 'Expires',
-      width: '120px',
+      width: '100px',
       cell: (p) => {
         const e = formatExpiry(p.expires_at, now)
         return e.tone === 'neutral' ? <span className="muted">{e.text}</span> : <Badge tone={e.tone}>{e.text}</Badge>
@@ -163,42 +160,32 @@ export function ProxiesPage() {
     {
       key: 'wan',
       header: 'WAN IP',
-      width: '130px',
+      width: '116px',
       cell: (p) => (p.wan_ip ? <span className="mono">{p.wan_ip}</span> : <span className="faint">no address</span>),
     },
     {
       key: 'signal',
-      header: 'Signal',
-      width: '110px',
+      header: 'Signal & quota',
+      width: '190px',
       cell: (p) => (
-        <span className={'mono ' + (signalTone(p.signal_bars) === 'danger' ? '' : 'muted')}>
-          {signalText(p.signal_bars)}
+        <span className="col" style={{ gap: 4 }}>
+          <span className={'mono ' + (signalTone(p.signal_bars) === 'danger' ? '' : 'muted')}>
+            {signalText(p.signal_bars)}
+          </span>
+          <Meter
+            label={`SIM quota used for ${p.id}`}
+            value={p.data_used_bytes ?? 0}
+            max={p.data_cap_bytes ?? 0}
+            format={formatBytes}
+          />
         </span>
       ),
     },
     {
-      key: 'data',
-      header: 'Data (SIM quota)',
-      width: '170px',
-      cell: (p) => (
-        <Meter
-          label={`SIM quota used for ${p.id}`}
-          value={p.data_used_bytes ?? 0}
-          max={p.data_cap_bytes ?? 0}
-          format={formatBytes}
-        />
-      ),
-    },
-    {
-      key: 'ports',
-      header: 'Ports (observed)',
-      width: '150px',
-      cell: (p) => <PortsCell proxy={p} />,
-    },
-    {
       key: 'actions',
       header: 'Actions',
-      width: '230px',
+      width: '176px',
+      sticky: 'right',
       cell: (p) => (
         <ActionsCell
           proxy={p}
@@ -217,6 +204,7 @@ export function ProxiesPage() {
 
   return (
     <div className="page">
+      <div className="page-col" style={{ paddingBottom: 0 }}>
       <div className="page-head">
         <h1 className="page-title">Proxies</h1>
         <span className="muted">
@@ -234,8 +222,14 @@ export function ProxiesPage() {
           value={term}
           placeholder="id, host, customer, WAN IP"
           onChange={(e) => setTerm(e.target.value)}
+          style={{ width: 260 }}
         />
-        <Select label="State" value={state} onChange={(e) => setState(e.target.value as ProxyState | '')}>
+        <Select
+          label="State"
+          value={state}
+          onChange={(e) => setState(e.target.value as ProxyState | '')}
+          style={{ width: 160 }}
+        >
           <option value="">any state</option>
           {STATES.map((s) => (
             <option key={s} value={s}>
@@ -243,7 +237,12 @@ export function ProxiesPage() {
             </option>
           ))}
         </Select>
-        <Select label="Expiring within" value={expiring} onChange={(e) => setExpiring(e.target.value)}>
+        <Select
+          label="Expiring within"
+          value={expiring}
+          onChange={(e) => setExpiring(e.target.value)}
+          style={{ width: 160 }}
+        >
           <option value="">any time</option>
           <option value="3">3 days</option>
           <option value="7">7 days</option>
@@ -251,15 +250,24 @@ export function ProxiesPage() {
         </Select>
       </div>
 
-      {unbound > 0 ? (
-        <Notice tone="danger" title={`${unbound} proxies have a listener that is not bound`}>
-          3proxy exits 0 with no listener when its config is rejected, so &quot;running&quot; means
-          nothing. These rows show what the backend actually observed.
-        </Notice>
-      ) : null}
+      {unbound > 0 || overQuota > 0 ? (
+        <div className="page-alerts">
+          {unbound > 0 ? (
+            <Notice
+              compact
+              tone="danger"
+              title={`${unbound} proxies have a listener that is not bound`}
+              hint={
+                '3proxy exits 0 with no listener when its config is rejected, so "running" means ' +
+                'nothing. These rows show what the backend actually observed.'
+              }
+            />
+          ) : null}
 
-      {overQuota > 0 ? (
-        <Notice tone="warn" title={`${overQuota} SIMs are at or above 90% of their quota`} />
+          {overQuota > 0 ? (
+            <Notice compact tone="warn" title={`${overQuota} SIMs are at or above 90% of their quota`} />
+          ) : null}
+        </div>
       ) : null}
 
       {list.isError ? (
@@ -267,19 +275,22 @@ export function ProxiesPage() {
           {list.error.message}
         </Notice>
       ) : null}
+      </div>
 
-      <Table
-        caption="Proxies"
-        columns={columns}
-        rows={rows}
-        rowKey={(p) => p.id}
-        selectedKey={selected}
-        onRowActivate={(p) => {
-          setAutoRotate(false)
-          setSelected(p.id)
-        }}
-        empty={list.isPending ? 'Loading proxies…' : 'No proxies match this filter.'}
-      />
+      <div className="page-col-bleed">
+        <Table
+          caption="Proxies"
+          columns={columns}
+          rows={rows}
+          rowKey={(p) => p.id}
+          selectedKey={selected}
+          onRowActivate={(p) => {
+            setAutoRotate(false)
+            setSelected(p.id)
+          }}
+          empty={list.isPending ? 'Loading proxies…' : 'No proxies match this filter.'}
+        />
+      </div>
 
       <ProxyDrawer
         proxyId={selected}

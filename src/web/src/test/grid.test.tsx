@@ -5,17 +5,7 @@ import { ProxiesPage } from '../routes/proxies/ProxiesPage'
 import { renderApp } from './render'
 import { db } from './state'
 
-const HEADERS = [
-  'Status',
-  'Proxy',
-  'Customer',
-  'Expires',
-  'WAN IP',
-  'Signal',
-  'Data (SIM quota)',
-  'Ports (observed)',
-  'Actions',
-]
+const HEADERS = ['Status', 'Proxy', 'Customer', 'Expires', 'WAN IP', 'Signal & quota', 'Actions']
 
 async function openGrid() {
   const user = userEvent.setup()

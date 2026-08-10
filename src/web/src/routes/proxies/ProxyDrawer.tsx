@@ -27,7 +27,7 @@ function RotationHistory({ proxyId }: { proxyId: string }) {
           <li key={r.id} className="list-item" style={{ cursor: 'default' }}>
             <div className="row">
               <Badge tone={r.result === 'changed' ? 'ok' : 'danger'}>{r.result}</Badge>
-              <span className="mono grow">
+              <span className="mono">
                 {r.old_public_ip ?? '?'} → {r.new_public_ip ?? '?'}
               </span>
               <span className="faint">{formatDurationMs(r.duration_ms)}</span>

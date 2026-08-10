@@ -387,3 +387,21 @@ to succeed. There is no fake systemd or fake nftables standing in for the real t
 that do exist (`netcfg=fake`, `device=sim`) are there to develop against, not to simulate the
 production stack end to end. The netns integration suite (`make test-netns`) is Linux-only for the
 same reason: it needs real network namespaces and root.
+
+### 10.3 Cloning on Windows
+
+A plain `git clone` aborts partway through checkout with `error: invalid path
+'src/internal/enroll/testdata/sysfs/bus/usb/devices/1-0:1.0/uevent'`, leaving an empty working
+tree. Ten captured Linux sysfs fixtures under `src/internal/enroll/testdata/sysfs/` have a `:` in
+their path, which NTFS cannot represent. Clone with `--no-checkout` and a sparse-checkout that
+excludes that directory instead:
+
+```
+git clone --no-checkout <repo-url>
+cd huawei-API
+git config core.protectNTFS false
+git config core.sparseCheckout true
+git config core.sparseCheckoutCone false
+printf '/*\n!/src/internal/enroll/testdata/sysfs/\n' > .git/info/sparse-checkout
+git checkout
+```

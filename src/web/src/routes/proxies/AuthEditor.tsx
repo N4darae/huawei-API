@@ -154,7 +154,7 @@ function IPListTab({ proxy }: { proxy: Proxy }) {
         {items.map((ip) => (
           <li key={ip.id} className="list-item" style={{ cursor: 'default' }}>
             <div className="row">
-              <span className="mono grow">{ip.cidr}</span>
+              <span className="mono">{ip.cidr}</span>
               {ip.note ? <span className="muted">{ip.note}</span> : null}
               <Button
                 variant="danger"
@@ -168,7 +168,7 @@ function IPListTab({ proxy }: { proxy: Proxy }) {
           </li>
         ))}
         {items.length === 0 && !list.isPending ? (
-          <li className="muted">No networks whitelisted.</li>
+          <li className="list-empty">No networks whitelisted.</li>
         ) : null}
       </ul>
 
