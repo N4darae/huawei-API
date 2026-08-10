@@ -172,7 +172,7 @@ Check with `uname -r`. `dongled preflight` gates on it.
 - **ModemManager disabled**, or the shipped udev ignore rule installed. ModemManager claims every
   HiLink netdev it sees and dials it independently.
 - `uhubctl` installed, if you want remote power recovery.
-- No other software holding TCP `8788`, `9788`, `20999`, `21001-21048`, `22001-22048`.
+- No other software holding TCP `8788`, `9788`, `20999`, `21001-21150`, `22001-22150`.
 
 ### 4.4 One host, or two?
 
@@ -205,7 +205,7 @@ bug to work around.
 
 Put the SIM in a phone first and turn the PIN off. `dongled enroll` reads `/api/pin/status` and
 refuses anything except `257` (ready) or `258` (PIN disabled). There is no remote unlock: a farm of
-48 sticks in a rack cannot be handed a PIN prompt.
+150 sticks in a rack cannot be handed a PIN prompt.
 
 ### 5.4 Buy SIMs from more than one carrier
 

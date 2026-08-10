@@ -15,7 +15,7 @@ There are two roles:
 
 - **panel host** — runs `dongled serve`, the SQLite database, and nginx in front of the web UI.
 - **farm host** — has the USB hubs, the dongles, the `dgNN` interfaces, the `ip rule`s, the nft table
-  and the 48 `dongled-proxy@` instances.
+  and the 150 `dongled-proxy@` instances.
 
 **They may be the same machine, and for a first deployment they should be — but only if that machine
 has USB ports a human being can physically reach.**
@@ -126,12 +126,12 @@ That places:
 |---|---|
 | `/etc/systemd/system/dongled.service` | the controller |
 | `/etc/systemd/system/dongled-proxy@.service` | the 3proxy instance template, rendered by the code that also renders the configs |
-| `/etc/sysusers.d/dongled.conf` | group `dongled` gid 6100, users `px01`..`px48` uid 6101..6148 |
+| `/etc/sysusers.d/dongled.conf` | group `dongled` gid 6100, users `px01`..`px150` uid 6101..6250 |
 | `/etc/sysctl.d/60-dongled.conf` | `conf.default.rp_filter=2`, `ip_forward=0`, conntrack sizing |
 | `/etc/udev/rules.d/99-dongled-mm-ignore.rules` | keeps ModemManager and NetworkManager off the dongles |
 | `/etc/systemd/networkd.conf.d/dongled.conf` | `ManageForeignRoutingPolicyRules=no` |
 | `/etc/nginx/conf.d/dongled-limits.conf` | rate limit zones and the SSE server-block template |
-| `/etc/iproute2/rt_tables.d/dongled.conf` | names for route tables 1001-1048 |
+| `/etc/iproute2/rt_tables.d/dongled.conf` | names for route tables 1001-1150 |
 | `/etc/dongled/FARM` | marks this host as the farm |
 
 Re-running bootstrap is safe. It compares content and prints `keep` for anything already correct.
@@ -184,8 +184,8 @@ which is why the command refuses without `--force`.
 If a firewall is in the way, open the proxy ports:
 
 ```
-sudo ufw allow 21001:21048/tcp comment 'dongled socks'
-sudo ufw allow 22001:22048/tcp comment 'dongled http'
+sudo ufw allow 21001:21150/tcp comment 'dongled socks'
+sudo ufw allow 22001:22150/tcp comment 'dongled http'
 ```
 
 Only on the farm host, and only if you actually run ufw. The panel port `8788` and the metrics port
