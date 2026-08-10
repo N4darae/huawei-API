@@ -204,7 +204,7 @@ func writeCandidate(dir string, cfg []byte) (string, func(), error) {
 		cleanup()
 		return "", func() {}, fmt.Errorf("%w: %v", ErrValidateFailed, err)
 	}
-	if err := f.Chmod(0o644); err != nil {
+	if err := f.Chmod(0o600); err != nil {
 		f.Close()
 		cleanup()
 		return "", func() {}, fmt.Errorf("%w: %v", ErrValidateFailed, err)
