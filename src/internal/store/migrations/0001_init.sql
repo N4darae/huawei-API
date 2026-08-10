@@ -40,7 +40,7 @@ CREATE INDEX ix_dongles_node ON dongles(node_id);
 CREATE TABLE slots (
   id         TEXT PRIMARY KEY,
   node_id    TEXT    NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-  slot       INTEGER NOT NULL CHECK (slot BETWEEN 1 AND 48),
+  slot       INTEGER NOT NULL CHECK (slot BETWEEN 1 AND 150),
   usb_path   TEXT    NOT NULL,
   id_path    TEXT    NOT NULL DEFAULT '',
   if_name    TEXT    NOT NULL,

@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"net/netip"
 	"testing"
 
@@ -108,7 +109,7 @@ func TestSlotRangeIsClosed(t *testing.T) {
 			t.Errorf("slot %d must be invalid", int(s))
 		}
 	}
-	if _, ok := ParseIfaceName("dg99"); ok {
+	if _, ok := ParseIfaceName(fmt.Sprintf("%s%d", IfacePrefix, MaxSlots+1)); ok {
 		t.Error("ParseIfaceName accepted an out-of-range slot")
 	}
 	if _, ok := ParseIfaceName("enp1s0f0"); ok {

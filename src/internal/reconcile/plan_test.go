@@ -3,6 +3,7 @@ package reconcile
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -558,7 +559,13 @@ func TestActionsAreOrderedBySlot(t *testing.T) {
 
 func TestInvalidSlotRowsAreIgnored(t *testing.T) {
 	f := newFarm(1)
-	f.slots[99] = domain.SlotRow{ID: "s99", NodeID: testNodeID, Slot: 99, IfName: "dg99"}
+	beyond := domain.Slot(domain.MaxSlots + 1)
+	f.slots[beyond] = domain.SlotRow{
+		ID:     fmt.Sprintf("s%d", int(beyond)),
+		NodeID: testNodeID,
+		Slot:   beyond,
+		IfName: fmt.Sprintf("%s%d", domain.IfacePrefix, int(beyond)),
+	}
 	if got := Plan(f.world()); len(got) != 0 {
 		t.Fatalf("an out of range slot row produced %v", Actions(got).Kinds())
 	}

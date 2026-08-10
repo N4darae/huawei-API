@@ -97,10 +97,12 @@ func TestIsOurRulePriority(t *testing.T) {
 }
 
 func TestIsDongleIface(t *testing.T) {
-	if !IsDongleIface("dg01") || !IsDongleIface("dg48") {
+	last := domain.Slot(domain.MaxSlots).IfaceName()
+	if !IsDongleIface("dg01") || !IsDongleIface(last) {
 		t.Fatal("dongle interfaces must be recognised")
 	}
-	for _, n := range []string{"enp1s0f0", "lo", "tailscale0", "dg00", "dg49", "dgx"} {
+	beyond := fmt.Sprintf("%s%d", domain.IfacePrefix, domain.MaxSlots+1)
+	for _, n := range []string{"enp1s0f0", "lo", "tailscale0", "dg00", beyond, "dgx"} {
 		if IsDongleIface(n) {
 			t.Fatalf("%s must not be treated as a dongle interface", n)
 		}

@@ -310,9 +310,12 @@ func TestSlotRejectsOutOfRange(t *testing.T) {
 	ctx := context.Background()
 	seedNode(t, s)
 
-	err := s.Slots().Create(ctx, domain.SlotRow{ID: "x", NodeID: "n1", Slot: 49, USBPath: "1-1", IfName: "dg49"})
+	beyond := domain.Slot(domain.MaxSlots + 1)
+	err := s.Slots().Create(ctx, domain.SlotRow{
+		ID: "x", NodeID: "n1", Slot: beyond, USBPath: "1-1", IfName: beyond.IfaceName(),
+	})
 	if !errors.Is(err, domain.ErrInvalid) {
-		t.Fatalf("slot 49 returned %v, want ErrInvalid", err)
+		t.Fatalf("slot %d returned %v, want ErrInvalid", int(beyond), err)
 	}
 }
 

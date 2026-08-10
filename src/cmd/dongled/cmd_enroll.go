@@ -53,7 +53,7 @@ func init() {
 }
 
 func (c *enrollCmd) flags(fs *flag.FlagSet) {
-	fs.IntVar(&c.slot, "slot", 0, "slot number 1-48, 0 allocates the lowest free slot")
+	fs.IntVar(&c.slot, "slot", 0, "slot number 1-150, 0 allocates the lowest free slot")
 	fs.StringVar(&c.carrier, "carrier", "", "carrier name recorded on the dongle row")
 	fs.DurationVar(&c.wait, "wait", enroll.DefaultLinkWait, "how long to wait for the dongle to enumerate")
 	fs.DurationVar(&c.rediscover, "rediscover", enroll.DefaultRediscover, "how long to wait for the dongle at its new lan address")

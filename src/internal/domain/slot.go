@@ -10,8 +10,7 @@ import (
 )
 
 const (
-	// PROVISIONAL: pending A2/A3 hardware measurement
-	MaxSlots = 48
+	MaxSlots = 150
 	// PROVISIONAL: pending A2/A3 hardware measurement
 	IfacePrefix = "dg"
 	// PROVISIONAL: pending A2/A3 hardware measurement
