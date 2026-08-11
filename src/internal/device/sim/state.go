@@ -1,6 +1,7 @@
 package sim
 
 import (
+	"fmt"
 	"net/netip"
 	"strconv"
 	"time"
@@ -99,15 +100,15 @@ func newState(slot domain.Slot, carrier string) *state {
 	s := &state{
 		slot:            slot,
 		deviceName:      "E3372",
-		serialNumber:    "G4PDW166230036" + pad2(slot.Int()),
-		imei:            "8618210324795" + pad2(slot.Int()),
-		imsi:            "4010156257048" + pad2(slot.Int()),
+		serialNumber:    "G4PDW16623003" + pad3(slot.Int()),
+		imei:            "861821032479" + pad3(slot.Int()),
+		imsi:            "401015625704" + pad3(slot.Int()),
 		iccid:           "8999701560257048991F",
 		msisdn:          "",
 		hardwareVersion: "CL2E3372HM",
 		softwareVersion: "22.317.01.00.00",
 		webUIVersion:    "17.100.14.02.577",
-		macAddress1:     "BA:AB:BE:34:00:" + pad2(slot.Int()),
+		macAddress1:     "BA:AB:BE:34:00:" + macOctet(slot.Int()),
 		carrier:         carrier,
 		plmn:            DefaultPLMN,
 		rat:             DefaultRat,
@@ -181,12 +182,16 @@ func (s *state) connectTime(now time.Time) int64 {
 	return int64(now.Sub(s.connectedAt) / time.Second)
 }
 
-func pad2(n int) string {
-	if n < 10 {
-		return "0" + strconv.Itoa(n)
-	}
-	return strconv.Itoa(n)
-}
+// pad3 formats a slot as exactly three digits. Slots run to domain.MaxSlots (150), so
+// two digits cannot hold them: the previous n%100 wrapped slot 150 onto slot 50 and gave
+// both simulated dongles the same identity. Three digits keeps every slot distinct while
+// the concatenated serial/IMEI/IMSI stay their required fixed lengths, because the
+// prefixes above lost one character each.
+func pad3(n int) string { return fmt.Sprintf("%03d", n) }
+
+// macOctet formats a slot as one MAC octet. The last octet must be exactly two hex
+// characters, and 1..150 fits in a single octet, so hex holds the width without wrapping.
+func macOctet(n int) string { return fmt.Sprintf("%02X", n) }
 
 func itoa(n int) string { return strconv.Itoa(n) }
 
