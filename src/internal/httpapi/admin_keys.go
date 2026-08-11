@@ -82,6 +82,11 @@ func (a *API) createLinkToken(w http.ResponseWriter, r *http.Request) {
 			"a rotate link needs the rotate scope on its api key"))
 		return
 	}
+	if len(key.ProxyIDs) != 1 {
+		writeError(w, r, fail(http.StatusBadRequest, CodeInvalidRequest,
+			"a rotate link needs an api key scoped to exactly one proxy"))
+		return
+	}
 
 	token, secret, err := a.deps.Keys.CreateLinkToken(r.Context(), keyID)
 	if err != nil {

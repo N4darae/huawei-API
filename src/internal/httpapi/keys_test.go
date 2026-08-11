@@ -166,6 +166,36 @@ func TestALinkTokenNeedsARotateScopedKey(t *testing.T) {
 	}
 }
 
+// linkTarget resolves a link to key.ProxyIDs[0], so a link only means anything for a key
+// scoped to exactly one proxy. A key's proxy scope is fixed at creation, so minting a token
+// for any other key hands out a URL that can never work.
+func TestALinkTokenNeedsAKeyScopedToOneProxy(t *testing.T) {
+	h := newHarness(t)
+	h.login()
+
+	for _, tc := range []struct {
+		name     string
+		proxyIDs []string
+	}{
+		{"unrestricted", nil},
+		{"two proxies", []string{"px01", "px02"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			key, _ := h.newKey(tc.name, []string{auth.ScopeRotate}, tc.proxyIDs)
+			res := h.do(http.MethodPost, APIBase+"/keys/"+key.ID+"/link-tokens", nil)
+			if res.StatusCode != http.StatusBadRequest {
+				t.Fatalf("returned %d, want 400: %s", res.StatusCode, res.text())
+			}
+		})
+	}
+
+	key, _ := h.newKey("one proxy", []string{auth.ScopeRotate}, []string{"px01"})
+	res := h.do(http.MethodPost, APIBase+"/keys/"+key.ID+"/link-tokens", nil)
+	if res.StatusCode != http.StatusCreated {
+		t.Fatalf("a single-proxy key returned %d, want 201: %s", res.StatusCode, res.text())
+	}
+}
+
 func TestRevokingAnUnknownLinkTokenIs404(t *testing.T) {
 	h := newHarness(t)
 	h.login()
