@@ -185,7 +185,7 @@ func pad2(n int) string {
 	if n < 10 {
 		return "0" + strconv.Itoa(n)
 	}
-	return strconv.Itoa(n % 100)
+	return strconv.Itoa(n)
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
