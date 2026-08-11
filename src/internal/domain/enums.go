@@ -42,7 +42,7 @@ func AllOpStates() []OpState {
 }
 
 func (s OpState) Terminal() bool {
-	return s == OpSucceeded || s == OpFailed || s == OpCanceled
+	return s == OpSucceeded || s == OpFailed || s == OpCanceled || s == OpStalled
 }
 
 func (s OpState) Valid() bool {

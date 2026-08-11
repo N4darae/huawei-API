@@ -17,6 +17,8 @@ const operationCols = `id, kind, subject_type, subject_id, state, step, pct, sta
 
 const OrphanedByRestart = "orphaned by a panel restart; no process was adopted"
 
+const StalledPastDeadline = "stalled; the operation passed its deadline without finishing"
+
 func (r *operationRepo) Get(ctx context.Context, id string) (domain.Operation, error) {
 	row := r.q.QueryRowContext(ctx, `SELECT `+operationCols+` FROM operations WHERE id = ?`, id)
 	o, err := scanOperation(row)
@@ -150,9 +152,9 @@ func (r *operationRepo) ListActive(ctx context.Context) ([]domain.Operation, err
 
 func (r *operationRepo) MarkStalled(ctx context.Context, nowMS int64) (int, error) {
 	res, err := r.q.ExecContext(ctx,
-		`UPDATE operations SET state=?, updated_at=?
+		`UPDATE operations SET state=?, error=?, finished_at=?, updated_at=?
 		 WHERE finished_at IS NULL AND deadline_at > 0 AND deadline_at < ? AND state IN (?,?)`,
-		string(domain.OpStalled), nowMS, nowMS, string(domain.OpPending), string(domain.OpRunning))
+		string(domain.OpStalled), StalledPastDeadline, nowMS, nowMS, nowMS, string(domain.OpPending), string(domain.OpRunning))
 	if err != nil {
 		return 0, mapErr(err, "mark stalled operations")
 	}

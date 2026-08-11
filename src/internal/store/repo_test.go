@@ -760,19 +760,48 @@ func TestOperationMarkStalledAndReconcileOrphans(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	if got.State != domain.OpStalled || !got.Active() {
+	if got.State != domain.OpStalled || got.Active() {
 		t.Fatalf("stalled operation looks wrong: %+v", got)
+	}
+	if got.Error != StalledPastDeadline {
+		t.Fatalf("stall was not recorded as evidence: %+v", got)
+	}
+
+	actives, err := s.Operations().ListActive(ctx)
+	if err != nil || len(actives) != 0 {
+		t.Fatalf("%d operations are still live after stalling, err %v", len(actives), err)
+	}
+
+	n, err = s.Operations().MarkStalled(ctx, start+130_000)
+	if err != nil || n != 0 {
+		t.Fatalf("MarkStalled is not idempotent: %d, err %v", n, err)
 	}
 
 	n, err = s.Operations().ReconcileOrphans(ctx, start+130_000)
-	if err != nil || n != 3 {
+	if err != nil || n != 0 {
+		t.Fatalf("ReconcileOrphans reconciled %d finished operations, err %v", n, err)
+	}
+}
+
+func TestOperationReconcileOrphansFailsLiveRows(t *testing.T) {
+	s, _ := openStore(t)
+	ctx := context.Background()
+	seedNode(t, s)
+	seedSlot(t, s, 1)
+	start := int64(1786190400000)
+	if err := s.Operations().Create(ctx, domain.Operation{
+		ID: "op01", Kind: domain.OpRotate, SubjectType: domain.SubjectProxy, SubjectID: "p01",
+		State: domain.OpRunning, Trigger: domain.TriggerCustomerAPI,
+		StartedAt: start, DeadlineAt: start + 90_000,
+	}); err != nil {
+		t.Fatalf("Create op01: %v", err)
+	}
+
+	n, err := s.Operations().ReconcileOrphans(ctx, start+130_000)
+	if err != nil || n != 1 {
 		t.Fatalf("ReconcileOrphans reconciled %d, err %v", n, err)
 	}
-	actives, err := s.Operations().ListActive(ctx)
-	if err != nil || len(actives) != 0 {
-		t.Fatalf("%d operations are still live after a restart, err %v", len(actives), err)
-	}
-	got, err = s.Operations().Get(ctx, "op01")
+	got, err := s.Operations().Get(ctx, "op01")
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}

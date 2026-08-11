@@ -8,6 +8,8 @@ import (
 	"github.com/n4darae/huawei-API/src/internal/domain"
 )
 
+const DefaultFinishDeadline = 10 * time.Second
+
 type Policy struct {
 	HardDeadline       time.Duration
 	HoldEscalate       []time.Duration
@@ -113,6 +115,8 @@ func (p Policy) RebootRung() Rung {
 }
 
 func (p Policy) RowDeadline() time.Duration { return p.HardDeadline * 2 }
+
+func (p Policy) FinishDeadline() time.Duration { return DefaultFinishDeadline }
 
 func (p Policy) AttemptFits(remaining time.Duration, attempt int) bool {
 	return remaining >= p.HoldFor(attempt)+p.VerifyTimeout

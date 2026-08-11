@@ -406,7 +406,9 @@ func (e *Engine) run(req Request, op domain.Operation, t target) {
 		defer e.release()
 		res = e.execute(ctx, &op, t)
 	}
-	e.finish(ctx, req, op, t, res)
+	finishCtx, finishCancel := context.WithTimeout(context.WithoutCancel(ctx), e.pol.FinishDeadline())
+	defer finishCancel()
+	e.finish(finishCtx, req, op, t, res)
 }
 
 func (e *Engine) acquire(ctx context.Context) error {
