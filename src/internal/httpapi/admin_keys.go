@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -107,4 +108,21 @@ func keyMayUse(key auth.Key, proxyID string) error {
 		return nil
 	}
 	return domain.Wrap(domain.ErrForbidden, "httpapi: this api key is not allowed on proxy %q", proxyID)
+}
+
+func (a *API) keyMayUseProxy(ctx context.Context, key auth.Key, proxyID string) error {
+	if err := keyMayUse(key, proxyID); err != nil {
+		return err
+	}
+	if key.CustomerID == nil {
+		return nil
+	}
+	px, err := a.deps.Repos.Proxies().Get(ctx, proxyID)
+	if err != nil {
+		return err
+	}
+	if px.CustomerID == nil || *px.CustomerID != *key.CustomerID {
+		return domain.Wrap(domain.ErrForbidden, "httpapi: this api key is not allowed on proxy %q", proxyID)
+	}
+	return nil
 }

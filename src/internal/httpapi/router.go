@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -17,6 +18,15 @@ const (
 	EventPath = APIBase + "/events"
 )
 
+type peerAddrKey struct{}
+
+func withPeerAddr(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), peerAddrKey{}, r.RemoteAddr)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 type Mounter interface {
 	Mount(r chi.Router)
 }
@@ -31,6 +41,7 @@ func NewRouter(health HealthFunc, mods ...Mounter) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
+	r.Use(withPeerAddr)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(noStoreAPI)

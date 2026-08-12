@@ -485,6 +485,17 @@ func (h *harness) newKey(name string, scopes []string, proxyIDs []string) (auth.
 	return key, secret
 }
 
+func (h *harness) newCustomerKey(name, customerID string, scopes []string, proxyIDs []string) (auth.Key, string) {
+	h.t.Helper()
+	key, secret, err := h.keys.Create(context.Background(), auth.NewKey{
+		Name: name, CustomerID: &customerID, Scopes: scopes, ProxyIDs: proxyIDs,
+	})
+	if err != nil {
+		h.t.Fatalf("create key: %v", err)
+	}
+	return key, secret
+}
+
 func (h *harness) bearer(method, path, secret string) *response {
 	h.t.Helper()
 	req, err := http.NewRequest(method, h.srv.URL+path, nil)

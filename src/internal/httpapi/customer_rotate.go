@@ -20,7 +20,7 @@ func (a *API) rotateProxyCustomer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	proxyID := chi.URLParam(r, "proxy_id")
-	if err := keyMayUse(key, proxyID); err != nil {
+	if err := a.keyMayUseProxy(r.Context(), key, proxyID); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}
@@ -123,7 +123,7 @@ func (a *API) customerStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	proxyID := chi.URLParam(r, "proxy_id")
-	if err := keyMayUse(key, proxyID); err != nil {
+	if err := a.keyMayUseProxy(r.Context(), key, proxyID); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}

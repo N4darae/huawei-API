@@ -220,7 +220,7 @@ func (a *API) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	subject := strings.ToLower(strings.TrimSpace(req.Username)) + "@" + clientIP(r)
+	subject := strings.ToLower(strings.TrimSpace(req.Username)) + "@" + peerIP(r)
 	wait, err := a.deps.Lockout.Check(r.Context(), subject)
 	if err != nil {
 		writeError(w, r, translate(err))
@@ -310,24 +310,38 @@ func decodeBody(r *http.Request, dst any) error {
 	return nil
 }
 
+func peerIP(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	if addr, ok := r.Context().Value(peerAddrKey{}).(string); ok && addr != "" {
+		return parseIP(addr)
+	}
+	return clientIP(r)
+}
+
 func clientIP(r *http.Request) string {
 	if r == nil {
 		return ""
 	}
-	if r.RemoteAddr == "" {
+	return parseIP(r.RemoteAddr)
+}
+
+func parseIP(remoteAddr string) string {
+	if remoteAddr == "" {
 		return ""
 	}
-	if ap, err := netip.ParseAddrPort(r.RemoteAddr); err == nil {
+	if ap, err := netip.ParseAddrPort(remoteAddr); err == nil {
 		return ap.Addr().String()
 	}
-	if a, err := netip.ParseAddr(r.RemoteAddr); err == nil {
+	if a, err := netip.ParseAddr(remoteAddr); err == nil {
 		return a.String()
 	}
-	host, _, found := strings.Cut(r.RemoteAddr, ":")
+	host, _, found := strings.Cut(remoteAddr, ":")
 	if found {
 		return host
 	}
-	return r.RemoteAddr
+	return remoteAddr
 }
 
 func queryInt(r *http.Request, name string) (int, bool) {

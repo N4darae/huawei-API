@@ -100,34 +100,29 @@ func (l *Lockout) Check(ctx context.Context, subject string) (time.Duration, err
 
 func (l *Lockout) Fail(ctx context.Context, subject string) (time.Duration, error) {
 	now := l.nowMS()
-	row, ok, err := l.read(ctx, subject)
-	if err != nil {
-		return 0, err
-	}
+	window := l.policy.Window.Milliseconds()
 
-	failures := 1
-	firstAt := now
-	if ok && now-row.firstAt <= l.policy.Window.Milliseconds() {
-		failures = row.failures + 1
-		firstAt = row.firstAt
-	}
-
-	lockedUntil := int64(0)
-	var locked time.Duration
-	if failures >= l.policy.Threshold {
-		locked = l.penaltyFor(failures)
-		lockedUntil = now + locked.Milliseconds()
-		failures = 0
-		firstAt = now
-	}
-
-	_, err = l.db.ExecContext(ctx,
-		`INSERT INTO auth_lockout(subject, failures, first_at, locked_until) VALUES(?,?,?,?)
-		 ON CONFLICT(subject) DO UPDATE SET failures = excluded.failures, first_at = excluded.first_at,
-		   locked_until = max(excluded.locked_until, auth_lockout.locked_until)`,
-		subject, failures, firstAt, lockedUntil)
+	var failures int
+	err := l.db.QueryRowContext(ctx,
+		`INSERT INTO auth_lockout(subject, failures, first_at, locked_until) VALUES(?,1,?,0)
+		 ON CONFLICT(subject) DO UPDATE SET
+		   failures = CASE WHEN ? - auth_lockout.first_at <= ? THEN auth_lockout.failures + 1 ELSE 1 END,
+		   first_at = CASE WHEN ? - auth_lockout.first_at <= ? THEN auth_lockout.first_at ELSE ? END
+		 RETURNING failures`,
+		subject, now, now, window, now, window, now).Scan(&failures)
 	if err != nil {
 		return 0, fmt.Errorf("auth: record failed attempt for %q: %w", subject, err)
+	}
+
+	if failures < l.policy.Threshold {
+		return 0, nil
+	}
+
+	locked := l.penaltyFor(failures)
+	if _, err := l.db.ExecContext(ctx,
+		`UPDATE auth_lockout SET locked_until = max(?, locked_until) WHERE subject = ?`,
+		now+locked.Milliseconds(), subject); err != nil {
+		return 0, fmt.Errorf("auth: lock %q: %w", subject, err)
 	}
 	return locked, nil
 }

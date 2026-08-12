@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/n4darae/huawei-API/src/internal/config"
@@ -36,6 +37,7 @@ type Sessions struct {
 	ttl    time.Duration
 	now    func() time.Time
 	params Params
+	decoy  func() string
 }
 
 func NewSessions(db DB, ttl time.Duration, now func() time.Time) *Sessions {
@@ -45,7 +47,20 @@ func NewSessions(db DB, ttl time.Duration, now func() time.Time) *Sessions {
 	if now == nil {
 		now = time.Now
 	}
-	return &Sessions{db: db, ttl: ttl, now: now, params: PasswordParams()}
+	params := PasswordParams()
+	return &Sessions{
+		db:     db,
+		ttl:    ttl,
+		now:    now,
+		params: params,
+		decoy: sync.OnceValue(func() string {
+			h, err := Hash("no-such-user", params)
+			if err != nil {
+				return ""
+			}
+			return h
+		}),
+	}
 }
 
 func (s *Sessions) TTL() time.Duration { return s.ttl }
@@ -89,8 +104,7 @@ func (s *Sessions) Authenticate(ctx context.Context, username, password string) 
 	var hash string
 	err := s.db.QueryRowContext(ctx, `SELECT password_hash FROM auth_users WHERE username = ?`, username).Scan(&hash)
 	if errors.Is(err, sql.ErrNoRows) {
-		decoy, herr := Hash("no-such-user", s.params)
-		if herr == nil {
+		if decoy := s.decoy(); decoy != "" {
 			_ = Verify(password, decoy)
 		}
 		return ErrBadCredentials

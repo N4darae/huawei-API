@@ -353,3 +353,33 @@ func TestARevokedKeyStopsWorking(t *testing.T) {
 		t.Fatalf("error code is %q", code)
 	}
 }
+
+func TestCustomerKeyCannotTouchAnotherCustomersProxy(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	now := domain.UnixMillis(h.clock.Now())
+	if err := h.store.Customers().Create(ctx, domain.Customer{
+		ID: "cus-2", Name: "Globex", Contact: "ops@globex.test", CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("customer: %v", err)
+	}
+	acme, globex := "cus-1", "cus-2"
+	if err := h.store.Proxies().SetCustomer(ctx, "px01", &acme, nil); err != nil {
+		t.Fatalf("assign px01: %v", err)
+	}
+	if err := h.store.Proxies().SetCustomer(ctx, "px02", &globex, nil); err != nil {
+		t.Fatalf("assign px02: %v", err)
+	}
+
+	_, secret := h.newCustomerKey("acme", acme, []string{auth.ScopeRotate, auth.ScopeStatus}, nil)
+
+	if res := h.bearer(http.MethodPost, APIBase+"/rotate/px01", secret); res.StatusCode != http.StatusAccepted {
+		t.Fatalf("rotate of its own proxy returned %d: %s", res.StatusCode, res.text())
+	}
+	if res := h.bearer(http.MethodPost, APIBase+"/rotate/px02", secret); res.StatusCode != http.StatusForbidden {
+		t.Fatalf("rotate of another customer proxy returned %d", res.StatusCode)
+	}
+	if res := h.bearer(http.MethodGet, APIBase+"/status/px02", secret); res.StatusCode != http.StatusForbidden {
+		t.Fatalf("status of another customer proxy returned %d", res.StatusCode)
+	}
+}
