@@ -107,30 +107,33 @@ func (m *Manager) EnsureGlobal(ctx context.Context, publicHosts []netip.Addr) er
 	if err != nil {
 		return err
 	}
-	have := map[netip.Addr]bool{}
-	for _, r := range rules {
-		if r.Priority != domain.RulePrioPublic {
-			continue
-		}
-		if !r.Src.IsValid() || r.Src.Bits() != r.Src.Addr().BitLen() {
-			continue
-		}
-		if r.IifName != "lo" || r.Table != rtTableMain {
-			continue
-		}
-		have[r.Src.Addr()] = true
-	}
 	wanted := map[netip.Addr]bool{}
 	for _, h := range want {
 		wanted[h] = true
 	}
-	for addr := range have {
-		if wanted[addr] {
+
+	have := map[netip.Addr]bool{}
+	total, stale := 0, 0
+	for _, r := range rules {
+		if r.Priority != domain.RulePrioPublic {
 			continue
 		}
-		if err := m.ruleDel(ctx, publicRuleArgs(addr)); err != nil {
-			return err
+		total++
+		addr := r.Src.Addr()
+		if isPublicRule(r) && wanted[addr] && !have[addr] {
+			have[addr] = true
+			continue
 		}
+		stale++
+	}
+
+	if stale > 0 {
+		for i := 0; i < total; i++ {
+			if err := m.ruleDel(ctx, []string{"priority", strconv.Itoa(domain.RulePrioPublic)}); err != nil {
+				return err
+			}
+		}
+		have = map[netip.Addr]bool{}
 	}
 	for _, h := range want {
 		if have[h] {
@@ -145,6 +148,23 @@ func (m *Manager) EnsureGlobal(ctx context.Context, publicHosts []netip.Addr) er
 	m.globalReady = true
 	m.mu.Unlock()
 	return nil
+}
+
+func countRulesAt(rules []netcfg.RuleState, prio int) int {
+	n := 0
+	for _, r := range rules {
+		if r.Priority == prio {
+			n++
+		}
+	}
+	return n
+}
+
+func isPublicRule(r netcfg.RuleState) bool {
+	if !r.Src.IsValid() || r.Src.Bits() != r.Src.Addr().BitLen() {
+		return false
+	}
+	return r.IifName == "lo" && r.Table == rtTableMain
 }
 
 func publicRuleArgs(a netip.Addr) []string {
@@ -271,9 +291,19 @@ func (m *Manager) RemoveSlot(ctx context.Context, s domain.Slot) error {
 			return err
 		}
 	}
+	rules, err := m.readRules(ctx)
+	if err != nil {
+		return err
+	}
 	for _, prio := range []int{s.RulePrioSrc(), s.RulePrioUID()} {
-		if err := m.ruleDel(ctx, []string{"priority", strconv.Itoa(prio)}); err != nil {
-			return err
+		n := countRulesAt(rules, prio)
+		if n < 1 {
+			n = 1
+		}
+		for i := 0; i < n; i++ {
+			if err := m.ruleDel(ctx, []string{"priority", strconv.Itoa(prio)}); err != nil {
+				return err
+			}
 		}
 	}
 	if _, err := m.exec(ctx, "ip", "route", "flush", "table", strconv.Itoa(s.RouteTable())); err != nil {
@@ -310,8 +340,12 @@ func (m *Manager) Observe(ctx context.Context) (netcfg.Observation, error) {
 	obs.IPForward = m.observer.IPForward()
 	obs.RouteTableNamesOK = files.RouteTablesComplete(m.rtTablesFile, m.slots)
 	for _, r := range rules {
-		if r.Priority == domain.RulePrioPublic && r.IifName == "lo" && r.Table == rtTableMain {
-			obs.PublicSrcRules = append(obs.PublicSrcRules, r)
+		if r.Priority == domain.RulePrioPublic {
+			if isPublicRule(r) {
+				obs.PublicSrcRules = append(obs.PublicSrcRules, r)
+			} else {
+				obs.ForeignRuleBelowCeil = append(obs.ForeignRuleBelowCeil, r)
+			}
 			continue
 		}
 		if r.Priority <= 0 || r.Priority >= domain.ForeignRuleCeil {

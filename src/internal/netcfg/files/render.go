@@ -126,11 +126,11 @@ func (r *Renderer) WriteSlot(s domain.Slot, idPath string) (Changed, error) {
 	if err != nil {
 		return c, err
 	}
-	c.Link, err = writeIfChanged(r.LinkPath(s), link)
+	c.Network, err = writeIfChanged(r.NetworkPath(s), network)
 	if err != nil {
 		return c, err
 	}
-	c.Network, err = writeIfChanged(r.NetworkPath(s), network)
+	c.Link, err = writeIfChanged(r.LinkPath(s), link)
 	if err != nil {
 		return c, err
 	}

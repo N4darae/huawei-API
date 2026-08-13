@@ -119,11 +119,30 @@ func TestEnsureGlobalRetiresAStaleLease(t *testing.T) {
 	if err := m.EnsureGlobal(context.Background(), []netip.Addr{netip.MustParseAddr("139.99.68.40")}); err != nil {
 		t.Fatalf("EnsureGlobal: %v", err)
 	}
-	if !rec.contains("ip rule del from 139.99.68.39/32 iif lo lookup main priority 900") {
+	if !rec.contains("ip rule del priority 900") {
 		t.Fatalf("the old lease rule must be removed, calls: %v", rec.calls)
 	}
 	if !rec.contains("ip rule add from 139.99.68.40/32 iif lo lookup main priority 900") {
 		t.Fatalf("the new lease rule must be added, calls: %v", rec.calls)
+	}
+}
+
+func TestEnsureGlobalRebuildsAMalformedRuleAtOurPriority(t *testing.T) {
+	rec := &recorder{}
+	stale := netcfg.RuleState{
+		Priority: domain.RulePrioPublic,
+		Table:    1005,
+		Src:      netip.MustParsePrefix("139.99.68.39/32"),
+	}
+	m := testManager(t, rec, []netcfg.RuleState{stale, publicRule("139.99.68.39")}, nil)
+	if err := m.EnsureGlobal(context.Background(), []netip.Addr{netip.MustParseAddr("139.99.68.39")}); err != nil {
+		t.Fatalf("EnsureGlobal: %v", err)
+	}
+	if got := rec.count("ip rule del priority 900"); got != 2 {
+		t.Fatalf("every rule at our priority must be cleared, got %d deletes: %v", got, rec.calls)
+	}
+	if !rec.contains("ip rule add from 139.99.68.39/32 iif lo lookup main priority 900") {
+		t.Fatalf("the good rule must be rebuilt, calls: %v", rec.calls)
 	}
 }
 

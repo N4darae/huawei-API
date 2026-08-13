@@ -59,12 +59,10 @@ func (m *Manager) AssertInvariants(ctx context.Context) []netcfg.Violation {
 		}
 	}
 	for _, r := range obs.ForeignRuleBelowCeil {
-		if r.Priority < domain.RulePrioPublic {
-			out = append(out, netcfg.Violation{
-				Name:   domain.InvariantNoForeignRule,
-				Detail: "foreign rule below the public rule: " + r.Raw,
-			})
-		}
+		out = append(out, netcfg.Violation{
+			Name:   domain.InvariantNoForeignRule,
+			Detail: fmt.Sprintf("foreign rule at priority %d: %s", r.Priority, r.Raw),
+		})
 	}
 	out = append(out, m.routingProbes(ctx, obs, hosts, slots)...)
 	return out
