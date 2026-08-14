@@ -18,6 +18,11 @@ import (
 
 const DefaultMaxHang = 30 * time.Second
 
+const (
+	maxSMSPageSize  = 200
+	maxSMSPageIndex = 10000
+)
+
 type SimDevice struct {
 	mu sync.Mutex
 
@@ -597,6 +602,12 @@ func (d *SimDevice) smsList(w http.ResponseWriter, req reqValues) {
 	if size <= 0 {
 		size = 20
 	}
+	if size > maxSMSPageSize {
+		size = maxSMSPageSize
+	}
+	if page > maxSMSPageIndex {
+		page = maxSMSPageIndex
+	}
 
 	d.mu.Lock()
 	all := make([]Message, 0, len(d.st.messages))
@@ -634,7 +645,7 @@ func (d *SimDevice) smsList(w http.ResponseWriter, req reqValues) {
 		}))
 	}
 	if len(pageItems) == 0 {
-		out := rewriteElements(hilink.Fixture("sms_sms_list_empty.xml"), map[string]string{"Count": "0"})
+		out := rewriteElements(hilink.Fixture("sms_sms_list_empty.xml"), map[string]string{"Count": itoa(len(all))})
 		writeXML(w, out, "", nil)
 		return
 	}

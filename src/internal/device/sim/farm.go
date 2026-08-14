@@ -33,6 +33,7 @@ type Farm struct {
 	devices map[domain.Slot]*SimDevice
 	servers map[domain.Slot]*httptest.Server
 	byAddr  map[netip.Addr]domain.Slot
+	addrOf  map[domain.Slot]netip.Addr
 	slots   []domain.Slot
 }
 
@@ -62,6 +63,7 @@ func NewFarm(n int, opt FarmOptions) *Farm {
 		devices: map[domain.Slot]*SimDevice{},
 		servers: map[domain.Slot]*httptest.Server{},
 		byAddr:  map[netip.Addr]domain.Slot{},
+		addrOf:  map[domain.Slot]netip.Addr{},
 	}
 	for i := 1; i <= n; i++ {
 		f.add(domain.Slot(i))
@@ -92,7 +94,23 @@ func (f *Farm) add(slot domain.Slot) {
 	f.devices[slot] = d
 	f.servers[slot] = srv
 	f.slots = append(f.slots, slot)
-	f.byAddr[st.dhcp.DHCPIPAddress] = slot
+	f.addrOf[slot] = st.dhcp.DHCPIPAddress
+	if _, taken := f.byAddr[st.dhcp.DHCPIPAddress]; !taken {
+		f.byAddr[st.dhcp.DHCPIPAddress] = slot
+	}
+}
+
+func (f *Farm) claimantOf(addr netip.Addr, except domain.Slot) (domain.Slot, bool) {
+	best, found := domain.Slot(0), false
+	for s, a := range f.addrOf {
+		if s == except || a != addr {
+			continue
+		}
+		if !found || s < best {
+			best, found = s, true
+		}
+	}
+	return best, found
 }
 
 func withLastOctet(a netip.Addr, last byte) netip.Addr {
@@ -119,7 +137,14 @@ func (f *Farm) rebind(old, cur netip.Addr, d *SimDevice) {
 	if !ok {
 		return
 	}
-	delete(f.byAddr, old)
+	f.addrOf[slot] = cur
+	if owner, ok := f.byAddr[old]; ok && owner == slot {
+		if next, taken := f.claimantOf(old, slot); taken {
+			f.byAddr[old] = next
+		} else {
+			delete(f.byAddr, old)
+		}
+	}
 	f.byAddr[cur] = slot
 }
 
@@ -197,6 +222,7 @@ func (f *Farm) Close() error {
 	f.servers = map[domain.Slot]*httptest.Server{}
 	f.devices = map[domain.Slot]*SimDevice{}
 	f.byAddr = map[netip.Addr]domain.Slot{}
+	f.addrOf = map[domain.Slot]netip.Addr{}
 	f.slots = nil
 	f.mu.Unlock()
 	for _, s := range servers {

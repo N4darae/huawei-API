@@ -12,7 +12,10 @@ import (
 	"github.com/n4darae/huawei-API/src/internal/domain"
 )
 
-const slot1 = domain.Slot(1)
+const (
+	slot1 = domain.Slot(1)
+	slot2 = domain.Slot(2)
+)
 
 func newFarm(t *testing.T, opt FarmOptions) *Farm {
 	t.Helper()
@@ -325,8 +328,11 @@ func TestSimDHCPChangeTimesOutInsteadOfAnswering(t *testing.T) {
 	if url := f.BaseURLForAddr(target); url == "" {
 		t.Fatal("the device must be reachable at its new address")
 	}
-	if url := f.BaseURLForAddr(device.FactoryDefaultAddr); url != "" {
+	if url := f.BaseURLForAddr(device.FactoryDefaultAddr); url == f.BaseURL(slot1) {
 		t.Fatal("the device must no longer answer at the old address")
+	}
+	if url := f.BaseURLForAddr(device.FactoryDefaultAddr); url != f.BaseURL(slot2) {
+		t.Fatalf("the slot still parked at the factory address must own it, url = %q", url)
 	}
 }
 

@@ -143,7 +143,8 @@ func newState(slot domain.Slot, carrier string) *state {
 }
 
 func carrierIP(n uint32) netip.Addr {
-	return netip.AddrFrom4([4]byte{10, 115, byte(n >> 8), byte(n%254 + 1)})
+	v := n % (254 * 254)
+	return netip.AddrFrom4([4]byte{10, 115, byte(v/254 + 1), byte(v%254 + 1)})
 }
 
 func (s *state) rotateIP() {

@@ -136,7 +136,13 @@ func (c *Client) ensureSession(ctx context.Context) error {
 }
 
 func (c *Client) attempt(ctx context.Context, method, path string, body []byte, out any) error {
-	cookie, token, ok := c.sess.snapshot()
+	var cookie, token string
+	var ok bool
+	if method == http.MethodPost {
+		cookie, token, ok = c.sess.take()
+	} else {
+		cookie, token, ok = c.sess.snapshot()
+	}
 	if !ok {
 		return domain.Wrap(domain.ErrTokenInvalid, "hilink: no session for %s", path)
 	}
@@ -148,7 +154,6 @@ func (c *Client) attempt(ctx context.Context, method, path string, body []byte, 
 	req.Header.Set(HeaderToken, token)
 	if method == http.MethodPost {
 		req.Header.Set("Content-Type", ContentTypeXML)
-		c.sess.consume()
 	}
 
 	resp, err := c.hc.Do(req)

@@ -33,10 +33,9 @@ type sesTokInfo struct {
 }
 
 type session struct {
-	mu        sync.Mutex
-	cookie    string
-	tokens    []string
-	headStale bool
+	mu     sync.Mutex
+	cookie string
+	tokens []string
 }
 
 func (s *session) snapshot() (string, string, bool) {
@@ -48,14 +47,15 @@ func (s *session) snapshot() (string, string, bool) {
 	return s.cookie, s.tokens[0], true
 }
 
-func (s *session) consume() {
+func (s *session) take() (string, string, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(s.tokens) > 1 {
-		s.tokens = s.tokens[1:]
-		return
+	if s.cookie == "" || len(s.tokens) == 0 {
+		return "", "", false
 	}
-	s.headStale = true
+	token := s.tokens[0]
+	s.tokens = s.tokens[1:]
+	return s.cookie, token, true
 }
 
 func (s *session) reset() {
@@ -63,7 +63,6 @@ func (s *session) reset() {
 	defer s.mu.Unlock()
 	s.cookie = ""
 	s.tokens = nil
-	s.headStale = false
 }
 
 func (s *session) install(cookie string, tokens []string) int {
@@ -74,7 +73,6 @@ func (s *session) install(cookie string, tokens []string) int {
 	}
 	if len(tokens) > 0 {
 		s.tokens = tokens
-		s.headStale = false
 	}
 	return len(s.tokens)
 }
@@ -85,10 +83,6 @@ func (s *session) absorb(tokens []string) int {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.headStale && len(s.tokens) > 0 {
-		s.tokens = s.tokens[1:]
-		s.headStale = false
-	}
 	s.tokens = append(s.tokens, tokens...)
 	if len(s.tokens) > TokenBatchSize {
 		s.tokens = s.tokens[len(s.tokens)-TokenBatchSize:]
