@@ -256,10 +256,16 @@ func (e *Engine) Rotate(ctx context.Context, req Request) (*domain.Operation, er
 
 	done := make(chan struct{})
 	e.mu.Lock()
+	if e.closed {
+		e.mu.Unlock()
+		_ = e.deps.Repos.Operations().Finish(ctx, op.ID, domain.OpCanceled, ErrClosed.Error(), "{}",
+			domain.UnixMillis(e.deps.Clock.Now()))
+		return nil, ErrClosed
+	}
 	e.waiters[op.ID] = done
+	e.wg.Add(1)
 	e.mu.Unlock()
 
-	e.wg.Add(1)
 	go func(op domain.Operation) {
 		defer e.wg.Done()
 		defer func() {

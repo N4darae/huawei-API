@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/n4darae/huawei-API/src/internal/domain"
@@ -59,7 +60,7 @@ type Store struct {
 
 	writeMu  sync.Mutex
 	closeOne sync.Once
-	closed   bool
+	closed   atomic.Bool
 }
 
 func Open(path string, k secrets.Sealer, opts ...Option) (*Store, error) {
@@ -114,7 +115,7 @@ func (s *Store) now() int64 { return domain.UnixMillis(s.clock.Now()) }
 func (s *Store) Close() error {
 	var err error
 	s.closeOne.Do(func() {
-		s.closed = true
+		s.closed.Store(true)
 		err = s.db.Close()
 	})
 	return err
@@ -175,7 +176,7 @@ type Tx struct {
 func (t *Tx) Unwrap() *sql.Tx { return t.tx }
 
 func (s *Store) Tx(ctx context.Context, fn func(*Tx) error) error {
-	if s.closed {
+	if s.closed.Load() {
 		return ErrClosed
 	}
 	s.writeMu.Lock()

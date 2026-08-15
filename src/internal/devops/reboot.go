@@ -365,10 +365,16 @@ func (s *Service) start(ctx context.Context, kind domain.OpKind, subject domain.
 
 	done := make(chan struct{})
 	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		_ = s.deps.Repos.Operations().Finish(ctx, op.ID, domain.OpCanceled, ErrClosed.Error(), "{}",
+			domain.UnixMillis(s.deps.Clock.Now()))
+		return nil, ErrClosed
+	}
 	s.waiters[op.ID] = done
+	s.wg.Add(1)
 	s.mu.Unlock()
 
-	s.wg.Add(1)
 	go func(op domain.Operation) {
 		defer s.wg.Done()
 		defer func() {
