@@ -224,6 +224,9 @@ func (p *Poller) pollDevice(ctx context.Context, row domain.SlotRow, prev Observ
 		out := last
 		out.Reachable = false
 		out.Err = err.Error()
+		if out.FailingSince.IsZero() {
+			out.FailingSince = now
+		}
 		return out, true
 	}
 	p.recordSuccess(row.Slot)
@@ -244,6 +247,7 @@ func (p *Poller) observeDevice(ctx context.Context, row domain.SlotRow, last Dev
 		return DeviceObservation{}, err
 	}
 	out.Reachable = true
+	out.FailingSince = time.Time{}
 	out.ObservedAt = p.deps.Clock.Now()
 	out.Conn = status.ConnectionStatus
 	if status.WanIP.IsValid() {

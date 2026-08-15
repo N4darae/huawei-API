@@ -515,7 +515,7 @@ func (e *Engine) execute(ctx context.Context, op *domain.Operation, t target) re
 			return failed(res, ReasonProbeFailed, perr)
 		}
 		res.New = p.IP
-		if p.IP.IsValid() && p.IP != res.Old {
+		if p.IP.IsValid() && res.Old.IsValid() && p.IP != res.Old {
 			res.Changed = true
 			res.Reason = ReasonChanged
 			e.step(ctx, op, domain.StepDone)

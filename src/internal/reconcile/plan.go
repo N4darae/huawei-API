@@ -145,7 +145,11 @@ func planRecovery(w World, row domain.SlotRow, d domain.Dongle, px domain.Proxy,
 	}
 
 	if !dev.Reachable {
-		if domain.UnixMillis(w.Now)-domain.UnixMillis(dev.ObservedAt) < UnreachableRebootAfter {
+		since := dev.ObservedAt
+		if since.IsZero() {
+			since = dev.FailingSince
+		}
+		if since.IsZero() || domain.UnixMillis(w.Now)-domain.UnixMillis(since) < UnreachableRebootAfter {
 			return nil
 		}
 		if !w.Budgets.RebootAllowed(d.ID, w.Now) {

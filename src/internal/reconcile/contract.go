@@ -21,17 +21,18 @@ type DesiredState struct {
 }
 
 type DeviceObservation struct {
-	Reachable   bool
-	Conn        device.ConnStatus
-	Sim         device.SimState
-	NetMode     device.NetMode
-	WanIP       netip.Addr
-	Signal      device.Signal
-	Traffic     device.Traffic
-	MaxIdleTime int
-	LoginNeeded bool
-	ObservedAt  time.Time
-	Err         string
+	Reachable    bool
+	Conn         device.ConnStatus
+	Sim          device.SimState
+	NetMode      device.NetMode
+	WanIP        netip.Addr
+	Signal       device.Signal
+	Traffic      device.Traffic
+	MaxIdleTime  int
+	LoginNeeded  bool
+	ObservedAt   time.Time
+	FailingSince time.Time
+	Err          string
 }
 
 type ObservedState struct {

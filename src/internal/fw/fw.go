@@ -64,6 +64,10 @@ func IsAbsent(err error) bool {
 	if err == nil {
 		return false
 	}
+	var missingBin *exec.Error
+	if errors.As(err, &missingBin) || errors.Is(err, exec.ErrNotFound) {
+		return false
+	}
 	for _, e := range []error{syscall.ENOENT, syscall.ENODEV, syscall.ESRCH} {
 		if errors.Is(err, e) {
 			return true
