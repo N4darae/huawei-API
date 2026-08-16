@@ -164,9 +164,13 @@ func (c *Config) BindFlags(fs *flag.FlagSet) {
 
 func backendVar(fs *flag.FlagSet, dst *Backend, name, usage string) {
 	fs.Func(name, usage, func(v string) error {
-		*dst = Backend(strings.ToLower(strings.TrimSpace(v)))
+		*dst = normalizeBackend(v)
 		return nil
 	})
+}
+
+func normalizeBackend(v string) Backend {
+	return Backend(strings.ToLower(strings.TrimSpace(v)))
 }
 
 func (c *Config) ApplyEnv(lookup func(string) (string, bool)) error {
@@ -199,16 +203,16 @@ func (c *Config) ApplyEnv(lookup func(string) (string, bool)) error {
 		c.LogLevel = v
 	}
 	if v, ok := lookup("DONGLED_NETCFG"); ok {
-		c.Netcfg = Backend(v)
+		c.Netcfg = normalizeBackend(v)
 	}
 	if v, ok := lookup("DONGLED_DEVICE"); ok {
-		c.Device = Backend(v)
+		c.Device = normalizeBackend(v)
 	}
 	if v, ok := lookup("DONGLED_PROXY"); ok {
-		c.Proxy = Backend(v)
+		c.Proxy = normalizeBackend(v)
 	}
 	if v, ok := lookup("DONGLED_FW"); ok {
-		c.Firewall = Backend(v)
+		c.Firewall = normalizeBackend(v)
 	}
 	if v, ok := lookup("DONGLED_SIM_SLOTS"); ok {
 		n, err := strconv.Atoi(v)

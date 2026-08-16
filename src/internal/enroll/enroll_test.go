@@ -47,6 +47,7 @@ func (t *trace) indexOf(s string) int {
 }
 
 type stubNetcfg struct {
+	obsMu   sync.Mutex
 	tr      *trace
 	mu      sync.Mutex
 	obs     netcfg.Observation
@@ -57,8 +58,8 @@ type stubNetcfg struct {
 }
 
 func (m *stubNetcfg) setObs(o netcfg.Observation) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.obsMu.Lock()
+	defer m.obsMu.Unlock()
 	m.obs = o
 }
 
@@ -84,8 +85,8 @@ func (m *stubNetcfg) RemoveSlot(_ context.Context, s domain.Slot) error {
 }
 
 func (m *stubNetcfg) Observe(context.Context) (netcfg.Observation, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.obsMu.Lock()
+	defer m.obsMu.Unlock()
 	return m.obs, nil
 }
 

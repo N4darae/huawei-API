@@ -406,7 +406,7 @@ func probeA2(ctx context.Context, cfg config.Config, addr string, slot domain.Sl
 	rep.Gates = "flat policy routing vs a network namespace per dongle. A failure here means P2 must change before any more code is written."
 
 	ctl := enroll.NewUSBController(enroll.USBOptions{SysfsRoot: sysfs})
-	before, _ := ctl.USBNets()
+	before, beforeErr := ctl.USBNets()
 
 	cur, err := d.DHCPSettings(ctx)
 	if err != nil {
@@ -456,7 +456,7 @@ func probeA2(ctx context.Context, cfg config.Config, addr string, slot domain.Sl
 			return serr
 		}
 	}
-	after, _ := ctl.USBNets()
+	after, afterErr := ctl.USBNets()
 
 	if settled == 0 {
 		rep.Facts = append(rep.Facts, fact{Name: "settle", Value: "NEVER", Note: "did not answer at " + slot.GatewayIP().String() + " within " + cfg.Carrier.HardDeadline.String()})
@@ -466,11 +466,21 @@ func probeA2(ctx context.Context, cfg config.Config, addr string, slot domain.Sl
 	rep.Facts = append(rep.Facts,
 		fact{Name: "settle_ms", Value: strconv.FormatInt(settled.Milliseconds(), 10),
 			Note: "budget this into the enrollment re-probe window"},
-		fact{Name: "usb_reenumerated", Value: strconv.FormatBool(!sameNets(before, after)),
-			Note: describeNets(before, after)},
+		usbReenumeratedFact(before, after, beforeErr, afterErr),
 	)
 	rep.Verdict = fmt.Sprintf("PASS: the LAN subnet moved in %dms. Flat policy routing stands.", settled.Milliseconds())
 	return nil
+}
+
+func usbReenumeratedFact(before, after []enroll.USBNet, beforeErr, afterErr error) fact {
+	if err := errors.Join(beforeErr, afterErr); err != nil {
+		return fact{Name: "usb_reenumerated", Value: "UNKNOWN", Note: "could not enumerate usb net devices: " + err.Error()}
+	}
+	return fact{
+		Name:  "usb_reenumerated",
+		Value: strconv.FormatBool(!sameNets(before, after)),
+		Note:  describeNets(before, after),
+	}
 }
 
 func sameNets(a, b []enroll.USBNet) bool {

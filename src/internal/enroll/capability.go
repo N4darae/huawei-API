@@ -344,8 +344,7 @@ func checkModemManager(ctx context.Context, o PreflightOptions) Check {
 	state, err := o.UnitEnabled(ctx, "ModemManager.service")
 	switch {
 	case err != nil && state == "":
-		c.OK = true
-		c.Detail = "ModemManager.service is not installed"
+		c.Detail = fmt.Sprintf("cannot read the ModemManager.service state (%v); install %s so it cannot claim a dongle netdev", err, UdevRuleName)
 	case state == "disabled" || state == "masked" || state == "not-found":
 		c.OK = true
 		c.Detail = "ModemManager.service is " + state

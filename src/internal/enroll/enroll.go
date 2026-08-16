@@ -251,7 +251,9 @@ func (e *Enroller) Enroll(ctx context.Context, req Request) (*Result, error) {
 		_ = e.d.Repos.Operations().Finish(clean, op.ID, domain.OpFailed, err.Error(), "", e.now())
 		return res, err
 	}
-	payload, _ := json.Marshal(res)
+	stored := *res
+	stored.Password = ""
+	payload, _ := json.Marshal(stored)
 	_ = e.d.Repos.Operations().Finish(ctx, op.ID, domain.OpSucceeded, "", string(payload), e.now())
 	return res, nil
 }
