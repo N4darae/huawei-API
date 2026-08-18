@@ -1,8 +1,10 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -96,11 +98,18 @@ func noStoreAPI(next http.Handler) http.Handler {
 
 func WriteJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
 	if body == nil {
+		w.WriteHeader(status)
 		return
 	}
-	enc := json.NewEncoder(w)
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
-	enc.Encode(body)
+	if err := enc.Encode(body); err != nil {
+		log.Printf("httpapi: failed to encode json response: %v", err)
+		http.Error(w, `{"error":"internal_error","message":"failed to encode response"}`, http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(status)
+	w.Write(buf.Bytes())
 }
