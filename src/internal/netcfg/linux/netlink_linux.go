@@ -3,6 +3,7 @@ package linux
 import (
 	"context"
 	"encoding/binary"
+	"sync"
 	"sync/atomic"
 	"syscall"
 
@@ -93,12 +94,29 @@ func (o *Observer) Subscribe(ctx context.Context) (<-chan netcfg.LinkEvent, func
 		return nil, nil, err
 	}
 	s := &subscription{fd: fd, ch: make(chan netcfg.LinkEvent, 64)}
+	var closeOnce sync.Once
+	closeFD := func() { closeOnce.Do(func() { syscall.Close(fd) }) }
+	done := make(chan struct{})
 	go func() {
+		select {
+		case <-ctx.Done():
+			s.stopped.Store(true)
+			closeFD()
+		case <-done:
+		}
+	}()
+	go func() {
+		defer close(done)
 		defer close(s.ch)
-		defer syscall.Close(fd)
+		defer closeFD()
 		seen := map[int]struct{}{}
 		for {
-			if s.stopped.Load() || ctx.Err() != nil {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			if s.stopped.Load() {
 				return
 			}
 			buf := make([]byte, 1<<16)

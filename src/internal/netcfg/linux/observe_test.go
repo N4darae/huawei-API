@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/n4darae/huawei-API/src/internal/netcfg"
 )
@@ -163,6 +164,27 @@ func TestLinkAndRuleDumpsWorkAgainstTheRunningKernel(t *testing.T) {
 	}
 	if len(routes) == 0 {
 		t.Fatal("route dump returned nothing")
+	}
+}
+
+func TestSubscribeExitsOnContextCancelWithoutCallingCancel(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("rtnetlink subscribe needs a linux kernel")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	o := NewObserver(nil)
+	ch, _, err := o.Subscribe(ctx)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	cancel()
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Fatal("channel must be closed after ctx cancel, not deliver an event")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("reader goroutine did not exit promptly after ctx cancel")
 	}
 }
 
