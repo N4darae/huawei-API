@@ -176,13 +176,15 @@ type counters struct {
 }
 
 type Service struct {
-	deps    Deps
-	to      Timeouts
-	mu      sync.Mutex
-	waiters map[string]chan struct{}
-	wg      sync.WaitGroup
-	closed  bool
-	usage   map[string]counters
+	deps           Deps
+	to             Timeouts
+	mu             sync.Mutex
+	waiters        map[string]chan struct{}
+	wg             sync.WaitGroup
+	closed         bool
+	usage          map[string]counters
+	shutdownCtx    context.Context
+	shutdownCancel context.CancelFunc
 }
 
 var _ Ops = (*Service)(nil)
@@ -232,7 +234,15 @@ func New(d Deps) (*Service, error) {
 	if to.RebootCooldown <= 0 {
 		to.RebootCooldown = def.RebootCooldown
 	}
-	return &Service{deps: d, to: to, waiters: map[string]chan struct{}{}, usage: map[string]counters{}}, nil
+	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
+	return &Service{
+		deps:           d,
+		to:             to,
+		waiters:        map[string]chan struct{}{},
+		usage:          map[string]counters{},
+		shutdownCtx:    shutdownCtx,
+		shutdownCancel: shutdownCancel,
+	}, nil
 }
 
 func (s *Service) Timeouts() Timeouts { return s.to }
@@ -316,6 +326,7 @@ func (s *Service) Shutdown(ctx context.Context) error {
 	s.mu.Lock()
 	s.closed = true
 	s.mu.Unlock()
+	s.shutdownCancel()
 	done := make(chan struct{})
 	go func() {
 		s.wg.Wait()
@@ -383,7 +394,7 @@ func (s *Service) start(ctx context.Context, kind domain.OpKind, subject domain.
 			s.mu.Unlock()
 			close(done)
 		}()
-		bg, cancel := context.WithTimeout(context.Background(), deadline*2)
+		bg, cancel := context.WithTimeout(s.shutdownCtx, deadline*2)
 		defer cancel()
 		payload, reason, err := fn(bg, &op)
 		s.finishOp(bg, op, payload, reason, err)

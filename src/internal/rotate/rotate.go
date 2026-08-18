@@ -103,13 +103,15 @@ type Deps struct {
 }
 
 type Engine struct {
-	deps    Deps
-	pol     Policy
-	sem     chan struct{}
-	mu      sync.Mutex
-	waiters map[string]chan struct{}
-	wg      sync.WaitGroup
-	closed  bool
+	deps           Deps
+	pol            Policy
+	sem            chan struct{}
+	mu             sync.Mutex
+	waiters        map[string]chan struct{}
+	wg             sync.WaitGroup
+	closed         bool
+	shutdownCtx    context.Context
+	shutdownCancel context.CancelFunc
 }
 
 var (
@@ -146,11 +148,14 @@ func New(d Deps) (*Engine, error) {
 	if err := pol.Validate(); err != nil {
 		return nil, err
 	}
+	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 	return &Engine{
-		deps:    d,
-		pol:     pol,
-		sem:     make(chan struct{}, pol.MaxConcurrent),
-		waiters: map[string]chan struct{}{},
+		deps:           d,
+		pol:            pol,
+		sem:            make(chan struct{}, pol.MaxConcurrent),
+		waiters:        map[string]chan struct{}{},
+		shutdownCtx:    shutdownCtx,
+		shutdownCancel: shutdownCancel,
 	}, nil
 }
 
@@ -298,6 +303,7 @@ func (e *Engine) Shutdown(ctx context.Context) error {
 	e.mu.Lock()
 	e.closed = true
 	e.mu.Unlock()
+	e.shutdownCancel()
 	done := make(chan struct{})
 	go func() {
 		e.wg.Wait()
@@ -402,7 +408,7 @@ type OpResult struct {
 }
 
 func (e *Engine) run(req Request, op domain.Operation, t target) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.pol.RowDeadline()+e.pol.WaitConnect)
+	ctx, cancel := context.WithTimeout(e.shutdownCtx, e.pol.RowDeadline()+e.pol.WaitConnect)
 	defer cancel()
 
 	var res result
