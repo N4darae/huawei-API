@@ -313,7 +313,7 @@ func (a *API) listProxyAuthIPs(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, translate(err))
 		return
 	}
-	a.writeAuthIPs(w, r, id)
+	a.writeAuthIPs(w, r, id, false)
 }
 
 func (a *API) addProxyAuthIP(w http.ResponseWriter, r *http.Request) {
@@ -340,11 +340,12 @@ func (a *API) addProxyAuthIP(w http.ResponseWriter, r *http.Request) {
 		Note:      strings.TrimSpace(req.Note),
 		CreatedAt: a.nowMS(),
 	}
-	if err := a.deps.Repos.Proxies().AddAuthIP(r.Context(), entry); err != nil && !errors.Is(err, domain.ErrConflict) {
+	err = a.deps.Repos.Proxies().AddAuthIP(r.Context(), entry)
+	if err != nil && !errors.Is(err, domain.ErrConflict) {
 		writeError(w, r, translate(err))
 		return
 	}
-	a.writeAuthIPs(w, r, id)
+	a.writeAuthIPs(w, r, id, err == nil)
 }
 
 func (a *API) deleteProxyAuthIP(w http.ResponseWriter, r *http.Request) {
@@ -359,14 +360,15 @@ func (a *API) deleteProxyAuthIP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, translate(err))
 		return
 	}
-	if err := a.deps.Repos.Proxies().DeleteAuthIP(r.Context(), id, prefix); err != nil && !errors.Is(err, domain.ErrNotFound) {
+	err = a.deps.Repos.Proxies().DeleteAuthIP(r.Context(), id, prefix)
+	if err != nil && !errors.Is(err, domain.ErrNotFound) {
 		writeError(w, r, translate(err))
 		return
 	}
-	a.writeAuthIPs(w, r, id)
+	a.writeAuthIPs(w, r, id, err == nil)
 }
 
-func (a *API) writeAuthIPs(w http.ResponseWriter, r *http.Request, proxyID string) {
+func (a *API) writeAuthIPs(w http.ResponseWriter, r *http.Request, proxyID string, broadcast bool) {
 	ips, err := a.deps.Repos.Proxies().ListAuthIPs(r.Context(), proxyID)
 	if err != nil {
 		writeError(w, r, translate(err))
@@ -376,7 +378,9 @@ func (a *API) writeAuthIPs(w http.ResponseWriter, r *http.Request, proxyID strin
 	for _, ip := range ips {
 		out.Items = append(out.Items, authIPDTO(ip))
 	}
-	a.publishProxyPatch(r.Context(), proxyID, map[string]any{"auth_ip_count": len(out.Items)})
+	if broadcast {
+		a.publishProxyPatch(r.Context(), proxyID, map[string]any{"auth_ip_count": len(out.Items)})
+	}
 	WriteJSON(w, http.StatusOK, out)
 }
 
