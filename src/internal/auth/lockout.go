@@ -128,7 +128,7 @@ func (l *Lockout) Fail(ctx context.Context, subject string) (time.Duration, erro
 }
 
 func (l *Lockout) penaltyFor(failures int) time.Duration {
-	rounds := failures / l.policy.Threshold
+	rounds := failures - l.policy.Threshold + 1
 	penalty := l.policy.Penalty
 	for i := 1; i < rounds && penalty < l.policy.MaxPenalty; i++ {
 		penalty *= 2
