@@ -9,6 +9,7 @@ import (
 	"github.com/n4darae/huawei-API/src/internal/device"
 	"github.com/n4darae/huawei-API/src/internal/device/sim"
 	"github.com/n4darae/huawei-API/src/internal/domain"
+	"github.com/n4darae/huawei-API/src/internal/eventbus"
 )
 
 func TestProxyListCarriesThePasswordSoExportCanWork(t *testing.T) {
@@ -187,6 +188,37 @@ func TestSetAuthRotatesThePasswordAndKeepsTheUsername(t *testing.T) {
 	if after.Username != before.Username {
 		t.Fatalf("username changed to %q", after.Username)
 	}
+}
+
+func TestSetAuthDoesNotBroadcastPasswordWhenSwitchingToIPList(t *testing.T) {
+	h := newHarness(t)
+	h.login()
+
+	res := h.do(http.MethodPost, APIBase+"/proxies/px01/auth-ips", AuthIPRequest{CIDR: "203.0.113.9/32"})
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("add auth ip returned %d: %s", res.StatusCode, res.text())
+	}
+
+	stream, closeStream := h.openStream(t, "?topics=proxies")
+	defer closeStream()
+	nextFrame(t, stream, 2*time.Second)
+
+	res = h.do(http.MethodPost, APIBase+"/proxies/px01/auth", SetAuthRequest{AuthMode: string(domain.AuthIPList)})
+	if res.StatusCode != http.StatusAccepted {
+		t.Fatalf("set auth returned %d: %s", res.StatusCode, res.text())
+	}
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		f := nextFrame(t, stream, 2*time.Second)
+		if f.name == string(eventbus.EvProxyPatch) && contains(f.data, "px01") {
+			if contains(f.data, "password") {
+				t.Fatalf("SSE patch leaked the password after switching to iplist: %q", f.data)
+			}
+			return
+		}
+	}
+	t.Fatal("the proxy patch never arrived")
 }
 
 func TestSetAuthToIPListWithNoWhitelistIsRefused(t *testing.T) {
