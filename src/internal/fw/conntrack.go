@@ -3,6 +3,7 @@ package fw
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"net/netip"
 	"syscall"
 )
@@ -169,6 +170,7 @@ func (n *Nft) FlushConntrack(ctx context.Context, src netip.Addr) (int, error) {
 	}
 	defer c.Close()
 	deleted := 0
+	var errs []error
 	for _, t := range targets {
 		if ctx.Err() != nil {
 			return deleted, ctx.Err()
@@ -180,9 +182,10 @@ func (n *Nft) FlushConntrack(ctx context.Context, src netip.Addr) (int, error) {
 			if err == syscall.ENOENT {
 				continue
 			}
+			errs = append(errs, err)
 			continue
 		}
 		deleted++
 	}
-	return deleted, nil
+	return deleted, errors.Join(errs...)
 }
