@@ -326,7 +326,6 @@ func (s *Service) Shutdown(ctx context.Context) error {
 	s.mu.Lock()
 	s.closed = true
 	s.mu.Unlock()
-	s.shutdownCancel()
 	done := make(chan struct{})
 	go func() {
 		s.wg.Wait()
@@ -334,8 +333,10 @@ func (s *Service) Shutdown(ctx context.Context) error {
 	}()
 	select {
 	case <-done:
+		s.shutdownCancel()
 		return nil
 	case <-ctx.Done():
+		s.shutdownCancel()
 		return ctx.Err()
 	}
 }

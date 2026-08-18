@@ -303,7 +303,6 @@ func (e *Engine) Shutdown(ctx context.Context) error {
 	e.mu.Lock()
 	e.closed = true
 	e.mu.Unlock()
-	e.shutdownCancel()
 	done := make(chan struct{})
 	go func() {
 		e.wg.Wait()
@@ -311,8 +310,10 @@ func (e *Engine) Shutdown(ctx context.Context) error {
 	}()
 	select {
 	case <-done:
+		e.shutdownCancel()
 		return nil
 	case <-ctx.Done():
+		e.shutdownCancel()
 		return ctx.Err()
 	}
 }
