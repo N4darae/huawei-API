@@ -95,8 +95,8 @@ func (f *Farm) add(slot domain.Slot) {
 	f.servers[slot] = srv
 	f.slots = append(f.slots, slot)
 	f.addrOf[slot] = st.dhcp.DHCPIPAddress
-	if _, taken := f.byAddr[st.dhcp.DHCPIPAddress]; !taken {
-		f.byAddr[st.dhcp.DHCPIPAddress] = slot
+	if owner, ok := f.claimantOf(st.dhcp.DHCPIPAddress, domain.Slot(0)); ok {
+		f.byAddr[st.dhcp.DHCPIPAddress] = owner
 	}
 }
 
