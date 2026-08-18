@@ -5,6 +5,8 @@ info:
   description: >-
     Operations panel and customer API for a farm of Huawei E3372 HiLink dongles sold as
     SOCKS5/HTTP proxies. Customer-facing identifiers are always proxy_id, never dongle_id.
+    Request bodies are capped at 1 MiB; a larger body gets a 413 response with
+    error code payload_too_large.
 servers:
   - url: /
 tags:
@@ -965,6 +967,7 @@ components:
         - key_revoked
         - not_found
         - invalid_request
+        - payload_too_large
         - op_in_progress
         - conflict
         - rate_limited

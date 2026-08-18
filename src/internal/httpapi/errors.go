@@ -25,6 +25,7 @@ const (
 	CodeKeyRevoked        = "key_revoked"
 	CodeNotFound          = "not_found"
 	CodeInvalidRequest    = "invalid_request"
+	CodePayloadTooLarge   = "payload_too_large"
 	CodeOpInProgress      = "op_in_progress"
 	CodeConflict          = "conflict"
 	CodeRateLimited       = "rate_limited"
@@ -41,7 +42,7 @@ const (
 func AllErrorCodes() []string {
 	return []string{
 		CodeUnauthorized, CodeInvalidCreds, CodeCSRFInvalid, CodeForbidden, CodeScopeMissing,
-		CodeKeyRevoked, CodeNotFound, CodeInvalidRequest, CodeOpInProgress, CodeConflict,
+		CodeKeyRevoked, CodeNotFound, CodeInvalidRequest, CodePayloadTooLarge, CodeOpInProgress, CodeConflict,
 		CodeRateLimited, CodeSimPinRequired, CodeDeviceUnreachable, CodeDegraded, CodeProxyExpired,
 		CodeNotImplemented, CodeMethodNotAllowed, CodeTimeout, CodeInternal,
 	}

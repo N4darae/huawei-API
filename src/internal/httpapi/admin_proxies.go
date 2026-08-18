@@ -239,7 +239,7 @@ func (a *API) rotateProxyAdmin(w http.ResponseWriter, r *http.Request) {
 func (a *API) setProxyAuth(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "proxy_id")
 	var req SetAuthRequest
-	if err := decodeBody(r, &req); err != nil {
+	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}
@@ -319,7 +319,7 @@ func (a *API) listProxyAuthIPs(w http.ResponseWriter, r *http.Request) {
 func (a *API) addProxyAuthIP(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "proxy_id")
 	var req AuthIPRequest
-	if err := decodeBody(r, &req); err != nil {
+	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}
@@ -350,7 +350,7 @@ func (a *API) addProxyAuthIP(w http.ResponseWriter, r *http.Request) {
 func (a *API) deleteProxyAuthIP(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "proxy_id")
 	var req AuthIPRequest
-	if err := decodeBody(r, &req); err != nil {
+	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}
@@ -398,7 +398,7 @@ func parseCIDR(raw string) (netip.Prefix, error) {
 func (a *API) setProxyPorts(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "proxy_id")
 	var req ProxyPolicy
-	if err := decodeBody(r, &req); err != nil {
+	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}
@@ -422,7 +422,7 @@ func (a *API) setProxyPorts(w http.ResponseWriter, r *http.Request) {
 func (a *API) setProxyEnabled(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "proxy_id")
 	var req EnableRequest
-	if err := decodeBody(r, &req); err != nil {
+	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}
@@ -436,7 +436,7 @@ func (a *API) setProxyEnabled(w http.ResponseWriter, r *http.Request) {
 func (a *API) assignProxyCustomer(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "proxy_id")
 	var req AssignCustomerRequest
-	if err := decodeBody(r, &req); err != nil {
+	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}
