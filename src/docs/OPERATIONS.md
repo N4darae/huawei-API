@@ -240,8 +240,8 @@ curl -s http://192.168.107.1/api/dialup/connection            # read the current
 Check the whole farm at once:
 
 ```
-for n in $(seq -w 1 150); do
-  v=$(curl -s --max-time 3 "http://192.168.1$n.1/api/dialup/connection" \
+for n in $(seq 1 150); do
+  v=$(curl -s --max-time 3 "http://192.168.$((100+n)).1/api/dialup/connection" \
       | sed -n 's:.*<MaxIdelTime>\([0-9]*\)</MaxIdelTime>.*:\1:p')
   [ -n "$v" ] && [ "$v" != "0" ] && echo "slot $n has MaxIdelTime=$v"
 done
