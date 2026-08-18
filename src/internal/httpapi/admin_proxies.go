@@ -299,11 +299,14 @@ func (a *API) setProxyAuth(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	a.publishProxyPatch(r.Context(), id, map[string]any{
+	patch := map[string]any{
 		"auth_mode": string(mode),
 		"username":  username,
-		"password":  password,
-	})
+	}
+	if mode.UsesUserPass() {
+		patch["password"] = password
+	}
+	a.publishProxyPatch(r.Context(), id, patch)
 	a.acceptSync(w, r, domain.OpSetAuth, domain.SubjectProxy, id)
 }
 
