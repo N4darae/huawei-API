@@ -118,7 +118,7 @@ func (a *API) getDongle(w http.ResponseWriter, r *http.Request) {
 func (a *API) patchDongle(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "dongle_id")
 	var req DonglePatchRequest
-	if err := decodeBody(r, &req); err != nil {
+	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}
@@ -200,7 +200,7 @@ func (a *API) setDongleNetMode(w http.ResponseWriter, r *http.Request) {
 	}
 	id := chi.URLParam(r, "dongle_id")
 	var req NetModeRequest
-	if err := decodeBody(r, &req); err != nil {
+	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}
@@ -225,7 +225,7 @@ func (a *API) setDongleLanIP(w http.ResponseWriter, r *http.Request) {
 	}
 	id := chi.URLParam(r, "dongle_id")
 	var req LanIPRequest
-	if err := decodeBody(r, &req); err != nil {
+	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}
@@ -312,7 +312,7 @@ func (a *API) listCustomers(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) createCustomer(w http.ResponseWriter, r *http.Request) {
 	var req CustomerRequest
-	if err := decodeBody(r, &req); err != nil {
+	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}
@@ -340,7 +340,7 @@ func (a *API) createCustomer(w http.ResponseWriter, r *http.Request) {
 func (a *API) patchCustomer(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "customer_id")
 	var req CustomerRequest
-	if err := decodeBody(r, &req); err != nil {
+	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}

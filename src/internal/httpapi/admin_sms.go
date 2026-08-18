@@ -65,7 +65,7 @@ func (a *API) sendSms(w http.ResponseWriter, r *http.Request) {
 	}
 	id := chi.URLParam(r, "dongle_id")
 	var req SmsSendRequest
-	if err := decodeBody(r, &req); err != nil {
+	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}
@@ -111,7 +111,7 @@ func (a *API) smsIndexAction(w http.ResponseWriter, r *http.Request, fn func(str
 	}
 	id := chi.URLParam(r, "dongle_id")
 	var req SmsIndexRequest
-	if err := decodeBody(r, &req); err != nil {
+	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}

@@ -215,7 +215,7 @@ func (a *API) Mount(r chi.Router) {
 
 func (a *API) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
-	if err := decodeBody(r, &req); err != nil {
+	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}
@@ -294,10 +294,15 @@ func (a *API) handleSession(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func decodeBody(r *http.Request, dst any) error {
-	body := http.MaxBytesReader(nil, r.Body, MaxBodyBytes)
+func decodeBody(w http.ResponseWriter, r *http.Request, dst any) error {
+	body := http.MaxBytesReader(w, r.Body, MaxBodyBytes)
 	raw, err := io.ReadAll(body)
 	if err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			return fail(http.StatusRequestEntityTooLarge, CodePayloadTooLarge,
+				"request body exceeds the 1 MiB limit")
+		}
 		return domain.Wrap(domain.ErrInvalid, "httpapi: request body could not be read")
 	}
 	if len(strings.TrimSpace(string(raw))) == 0 {

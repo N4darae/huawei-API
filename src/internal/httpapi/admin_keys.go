@@ -26,7 +26,7 @@ func (a *API) listApiKeys(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) createApiKey(w http.ResponseWriter, r *http.Request) {
 	var req ApiKeyRequest
-	if err := decodeBody(r, &req); err != nil {
+	if err := decodeBody(w, r, &req); err != nil {
 		writeError(w, r, translate(err))
 		return
 	}
