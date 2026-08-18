@@ -392,19 +392,17 @@ func (d *SimDevice) post(w http.ResponseWriter, r *http.Request, path string, re
 		d.ok(w)
 
 	case hilink.PathNetNetMode:
-		d.mu.Lock()
-		active := d.st.dataOn
-		d.mu.Unlock()
-		if active {
-			writeAPIError(w, "", domain.CodeSetNetModeWhenDialup)
-			return
-		}
 		m, ok := hilink.NetModeFromCode(req.get("NetworkMode"))
 		if !ok {
 			writeAPIError(w, "", domain.CodeFormatError)
 			return
 		}
 		d.mu.Lock()
+		if d.st.dataOn {
+			d.mu.Unlock()
+			writeAPIError(w, "", domain.CodeSetNetModeWhenDialup)
+			return
+		}
 		d.st.netMode = m
 		if v, ok := req.lookup("NetworkBand"); ok && v != "" {
 			d.st.networkBand = v
