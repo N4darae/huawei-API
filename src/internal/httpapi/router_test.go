@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -68,6 +69,17 @@ func TestUnknownAPIPathIsJSON404NotTheSPA(t *testing.T) {
 	}
 	if ct := rec.Header().Get("Content-Type"); ct != "application/json; charset=utf-8" {
 		t.Fatalf("unmounted api route content type = %q, want json", ct)
+	}
+}
+
+func TestWriteJSONReturns500OnEncodeError(t *testing.T) {
+	rec := httptest.NewRecorder()
+	WriteJSON(rec, http.StatusOK, map[string]float64{"value": math.NaN()})
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("encode failure status = %d, want 500", rec.Code)
+	}
+	if rec.Body.Len() == 0 {
+		t.Fatalf("encode failure should still write an error body")
 	}
 }
 
