@@ -204,7 +204,7 @@ func (a *API) linkRotateHTML(w http.ResponseWriter, r *http.Request, proxyID, ac
 		data.Result = res.Result
 		data.OldIP = res.OldIP
 		data.NewIP = res.NewIP
-		if res.Result != string(domain.RotationChanged) {
+		if res.Result != string(domain.RotationChanged) && res.Result != string(domain.RotationUnchanged) {
 			data.Error = "the rotation finished without a new address"
 		}
 	case rec.status >= 400:
