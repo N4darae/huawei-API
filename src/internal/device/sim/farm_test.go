@@ -336,6 +336,16 @@ func TestSimDHCPChangeTimesOutInsteadOfAnswering(t *testing.T) {
 	}
 }
 
+func TestSimFactoryDefaultLANRegistersEveryOwningSlot(t *testing.T) {
+	f := newFarm(t, FarmOptions{FactoryDefaultLAN: true})
+	if url := f.BaseURLForAddr(device.FactoryDefaultAddr); url != f.BaseURL(slot1) {
+		t.Fatalf("the lowest slot must own the shared factory address, url = %q", url)
+	}
+	if got := f.Device(slot2).LANAddr(); got != device.FactoryDefaultAddr {
+		t.Fatalf("slot2 must still be parked at the factory address, lan = %v", got)
+	}
+}
+
 func TestSimDHCPGatewayOutsidePoolSubnetReturns100005(t *testing.T) {
 	f := newFarm(t, FarmOptions{FactoryDefaultLAN: true})
 	c := newClient(t, f, slot1)
