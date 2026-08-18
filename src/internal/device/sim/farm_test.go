@@ -740,3 +740,38 @@ func TestSimIsolatedPerSlot(t *testing.T) {
 		t.Fatal("slots must not share a public ip")
 	}
 }
+
+// Slot identities must be unique across the whole 1..MaxSlots range and must keep the
+// widths the concatenated values imply: 15 digits for IMEI and IMSI, 16 characters for the
+// Huawei serial, and two hex characters for the final MAC octet. A formatter that wraps
+// (the old n%100) silently gave two slots the same identity, and one that simply widens
+// breaks the lengths instead, so both properties are asserted together here.
+func TestSlotIdentitiesAreUniqueAndFixedWidth(t *testing.T) {
+	seen := map[string]domain.Slot{}
+	for i := 1; i <= domain.MaxSlots; i++ {
+		slot := domain.Slot(i)
+		st := newState(slot, DefaultCarrier)
+
+		for _, tc := range []struct {
+			name  string
+			value string
+			want  int
+		}{
+			{"imei", st.imei, 15},
+			{"imsi", st.imsi, 15},
+			{"serialNumber", st.serialNumber, 16},
+			{"macAddress1", st.macAddress1, len("BA:AB:BE:34:00:") + 2},
+		} {
+			if len(tc.value) != tc.want {
+				t.Errorf("slot %d: %s = %q, length %d, want %d",
+					i, tc.name, tc.value, len(tc.value), tc.want)
+			}
+			key := tc.name + "=" + tc.value
+			if prev, dup := seen[key]; dup {
+				t.Errorf("slot %d: %s = %q already used by slot %d",
+					i, tc.name, tc.value, prev)
+			}
+			seen[key] = slot
+		}
+	}
+}
