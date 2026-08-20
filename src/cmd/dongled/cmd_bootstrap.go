@@ -150,6 +150,8 @@ func buildPlan(cfg config.Config, root, source string) ([]action, error) {
 
 	for _, c := range []struct{ from, to string }{
 		{"dongled.service", "/etc/systemd/system/" + config.UnitBackend},
+		{"dongled-backup.service", "/etc/systemd/system/" + config.UnitBackup},
+		{"dongled-backup.timer", "/etc/systemd/system/" + config.UnitBackupTimer},
 		{"sysusers.d/" + config.Product + ".conf", "/etc/sysusers.d/" + config.Product + ".conf"},
 		{"sysctl.d/60-" + config.Product + ".conf", "/etc/sysctl.d/60-" + config.Product + ".conf"},
 		{"udev/" + enroll.UdevRuleName, "/etc/udev/rules.d/" + enroll.UdevRuleName},
@@ -246,12 +248,13 @@ Those are yours to run, in this order, and each one is reversible:
   6. systemctl daemon-reload
   7. %s preflight                              must be green before step 8
   8. systemctl enable --now %s
-  9. nginx -t && systemctl reload nginx        never restart
+  9. systemctl enable --now %s
+ 10. nginx -t && systemctl reload nginx        never restart
 
 Step 4 restarts networking. Do it from the console or a tmux session, not over
 the ssh connection you need to keep.
 `, config.GroupName, config.GroupGID, domain.MaxSlots,
-		"/etc/sysctl.d/60-"+config.Product+".conf", config.Product, config.Product, config.UnitBackend)
+		"/etc/sysctl.d/60-"+config.Product+".conf", config.Product, config.Product, config.UnitBackend, config.UnitBackupTimer)
 }
 
 type bootstrapKEKCmd struct {

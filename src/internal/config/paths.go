@@ -12,12 +12,16 @@ const (
 	SessionCookie = "__Host-" + Product + "_session"
 	APIKeyPrefix  = "dgl_live_"
 
-	UnitBackend  = Product + ".service"
-	UnitProxyTpl = Product + "-proxy@.service"
+	UnitBackend     = Product + ".service"
+	UnitProxyTpl    = Product + "-proxy@.service"
+	UnitBackup      = Product + "-backup.service"
+	UnitBackupTimer = Product + "-backup.timer"
 
 	Pin3proxyCommit = "122ca26249aaaac9156e0805891555c70e19f2b3"
 
 	KEKCredName = "kek"
+
+	DefaultBackupKeep = 14
 )
 
 var (

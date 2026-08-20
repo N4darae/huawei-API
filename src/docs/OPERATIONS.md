@@ -339,6 +339,10 @@ dongled backup --verify /var/backups/dongled/dongled-20260808T101500Z.db
 
 `preflight` turns `recent_backup` red after 7 days.
 
+`systemctl enable --now dongled-backup.timer` runs `dongled backup` daily. Each successful run keeps
+only the newest 14 snapshots in `BackupDir`, deleting older ones; override the count with
+`DONGLED_BACKUP_KEEP`.
+
 A backup is useless without `/etc/dongled/kek.cred`. That file is the only thing that can decrypt the
 stored proxy passwords, and there is no recovery path if it is lost. Copy it off the machine together
 with the first backup, and confirm the copy is readable.
