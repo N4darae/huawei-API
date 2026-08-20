@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -12,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/n4darae/huawei-API/src/internal/config"
+	"github.com/n4darae/huawei-API/src/internal/domain"
 )
 
 type Command struct {
@@ -89,6 +91,10 @@ func usage() {
 }
 
 func runServe(ctx context.Context, cfg config.Config, _ []string) error {
+	if markers := domain.ProvisionalMarkers(); len(markers) > 0 {
+		slog.Warn("routing constants still marked PROVISIONAL — re-measure against real hardware before treating as final", "markers", markers)
+	}
+
 	app, err := Wire(ctx, cfg)
 	if err != nil {
 		return err
