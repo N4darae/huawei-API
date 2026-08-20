@@ -589,6 +589,9 @@ func BenchmarkPlan(b *testing.B) {
 }
 
 func TestPlanIsUnderOneMillisecondForAFullFarm(t *testing.T) {
+	if raceEnabled {
+		t.Skip("timing budget not meaningful under -race")
+	}
 	f := newFarm(48)
 	for _, s := range sortedSlots(f.slots) {
 		f.proxyStatus(s, func(st *proxysup.Status) { st.ProbeOK = false })
