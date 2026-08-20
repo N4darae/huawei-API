@@ -38,6 +38,14 @@ func buildPanel(ctx context.Context, app *App) (httpapi.Mounter, error) {
 	if err := auth.EnsureSchema(ctx, db.DB()); err != nil {
 		return nil, err
 	}
+
+	secureCookies, err := resolveSecureCookies(os.LookupEnv)
+	if err != nil {
+		return nil, err
+	}
+	if !secureCookies {
+		log.Warn("insecure session cookies allowed via DONGLED_ALLOW_INSECURE_COOKIES=1, do not use in production")
+	}
 	sessions := auth.NewSessions(db.DB(), cfg.SessionTTL, app.Clock.Now)
 	keys := auth.NewKeys(db.DB(), app.Clock.Now)
 	lockout := auth.NewLockout(db.DB(), auth.DefaultLockoutPolicy(), app.Clock.Now)
@@ -145,8 +153,19 @@ func buildPanel(ctx context.Context, app *App) (httpapi.Mounter, error) {
 		Clock:             app.Clock,
 		Log:               log,
 		MinRotateInterval: cfg.Carrier.MinRotateInterval,
-		SecureCookies:     true,
+		SecureCookies:     secureCookies,
 	})
+}
+
+func resolveSecureCookies(lookup func(string) (string, bool)) (bool, error) {
+	v, ok := lookup("DONGLED_ALLOW_INSECURE_COOKIES")
+	if !ok || v == "" {
+		return true, nil
+	}
+	if v != "1" {
+		return false, fmt.Errorf("invalid DONGLED_ALLOW_INSECURE_COOKIES value %q, expected \"1\"", v)
+	}
+	return false, nil
 }
 
 func policyFromConfig(cfg config.Config) rotate.Policy {

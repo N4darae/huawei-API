@@ -44,7 +44,6 @@ func NewRouter(health HealthFunc, mods ...Mounter) http.Handler {
 
 	r.Use(middleware.RequestID)
 	r.Use(withPeerAddr)
-	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(noStoreAPI)
 
