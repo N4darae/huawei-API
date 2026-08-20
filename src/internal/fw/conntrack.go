@@ -110,13 +110,13 @@ func tupleSource(tuple []byte) (netip.Addr, bool) {
 	return netip.Addr{}, false
 }
 
-func listConntrack(family uint8) ([]conntrackEntry, error) {
+func listConntrack(ctx context.Context, family uint8) ([]conntrackEntry, error) {
 	c, err := dialNetlink(netlinkNetfil)
 	if err != nil {
 		return nil, err
 	}
 	defer c.Close()
-	payloads, err := c.dump(nfMsgType(nfnlSubsysCtnetlink, ipctnlMsgCtGet), encodeNfGenMsg(family))
+	payloads, err := c.dump(ctx, nfMsgType(nfnlSubsysCtnetlink, ipctnlMsgCtGet), encodeNfGenMsg(family))
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (n *Nft) FlushConntrack(ctx context.Context, src netip.Addr) (int, error) {
 		return 0, ErrBadAddr
 	}
 	family := familyOf(src)
-	entries, err := listConntrack(family)
+	entries, err := listConntrack(ctx, family)
 	if err != nil {
 		if IsAbsent(err) {
 			return 0, nil
@@ -178,7 +178,7 @@ func (n *Nft) FlushConntrack(ctx context.Context, src netip.Addr) (int, error) {
 		payload := encodeNfGenMsg(family)
 		payload = append(payload, t.Tuple...)
 		payload = append(payload, t.ID...)
-		if err := c.request(nfMsgType(nfnlSubsysCtnetlink, ipctnlMsgCtDelete), payload); err != nil {
+		if err := c.request(ctx, nfMsgType(nfnlSubsysCtnetlink, ipctnlMsgCtDelete), payload); err != nil {
 			if err == syscall.ENOENT {
 				continue
 			}

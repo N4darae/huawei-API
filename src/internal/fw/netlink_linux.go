@@ -1,8 +1,15 @@
 package fw
 
 import (
+	"context"
 	"encoding/binary"
 	"syscall"
+	"time"
+)
+
+const (
+	netlinkRecvSliceTimeout = 200 * time.Millisecond
+	netlinkRecvOverallCap   = 5 * time.Second
 )
 
 type netlinkConn struct {
@@ -19,12 +26,32 @@ func dialNetlink(proto int) (*netlinkConn, error) {
 		syscall.Close(fd)
 		return nil, err
 	}
-	tv := syscall.Timeval{Sec: 5}
+	tv := syscall.NsecToTimeval(netlinkRecvSliceTimeout.Nanoseconds())
 	if err := syscall.SetsockoptTimeval(fd, syscall.SOL_SOCKET, syscall.SO_RCVTIMEO, &tv); err != nil {
 		syscall.Close(fd)
 		return nil, err
 	}
 	return &netlinkConn{fd: fd}, nil
+}
+
+func (c *netlinkConn) recvfrom(ctx context.Context, buf []byte) (int, error) {
+	deadline := time.Now().Add(netlinkRecvOverallCap)
+	for {
+		if err := ctx.Err(); err != nil {
+			return 0, err
+		}
+		n, _, err := syscall.Recvfrom(c.fd, buf, 0)
+		if err == nil {
+			return n, nil
+		}
+		if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+			if !time.Now().Before(deadline) {
+				return 0, syscall.EAGAIN
+			}
+			continue
+		}
+		return 0, err
+	}
 }
 
 func (c *netlinkConn) Close() error { return syscall.Close(c.fd) }
@@ -40,14 +67,14 @@ func (c *netlinkConn) send(kind uint16, flags uint16, payload []byte) error {
 	return syscall.Sendto(c.fd, msg, 0, &syscall.SockaddrNetlink{Family: syscall.AF_NETLINK})
 }
 
-func (c *netlinkConn) dump(kind uint16, payload []byte) ([][]byte, error) {
+func (c *netlinkConn) dump(ctx context.Context, kind uint16, payload []byte) ([][]byte, error) {
 	if err := c.send(kind, nlmFRequest|nlmFDump, payload); err != nil {
 		return nil, err
 	}
 	var out [][]byte
 	for {
 		buf := make([]byte, 1<<17)
-		n, _, err := syscall.Recvfrom(c.fd, buf, 0)
+		n, err := c.recvfrom(ctx, buf)
 		if err != nil {
 			return nil, err
 		}
@@ -79,13 +106,13 @@ func (c *netlinkConn) dump(kind uint16, payload []byte) ([][]byte, error) {
 	return out, nil
 }
 
-func (c *netlinkConn) request(kind uint16, payload []byte) error {
+func (c *netlinkConn) request(ctx context.Context, kind uint16, payload []byte) error {
 	if err := c.send(kind, nlmFRequest|nlmFAck, payload); err != nil {
 		return err
 	}
 	for {
 		buf := make([]byte, 1<<16)
-		n, _, err := syscall.Recvfrom(c.fd, buf, 0)
+		n, err := c.recvfrom(ctx, buf)
 		if err != nil {
 			return err
 		}
