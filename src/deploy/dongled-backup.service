@@ -1,0 +1,41 @@
+[Unit]
+Description=dongled database backup
+Documentation=file:///usr/local/share/dongled/docs/OPERATIONS.md
+After=dongled.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/dongled backup
+Environment=DONGLED_LOG_LEVEL=info
+EnvironmentFile=-/etc/dongled/dongled.env
+LoadCredentialEncrypted=kek:/etc/dongled/kek.cred
+
+StateDirectory=dongled
+StateDirectoryMode=0750
+LogsDirectory=dongled
+LogsDirectoryMode=0750
+ConfigurationDirectory=dongled
+WorkingDirectory=/var/lib/dongled
+
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_SETUID CAP_SETGID CAP_CHOWN CAP_DAC_OVERRIDE
+NoNewPrivileges=yes
+
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectProc=invisible
+PrivateTmp=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_INET AF_UNIX
+
+ReadWritePaths=/var/backups/dongled

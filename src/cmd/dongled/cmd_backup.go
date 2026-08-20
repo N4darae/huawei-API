@@ -4,6 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/n4darae/huawei-API/src/internal/config"
@@ -82,6 +88,7 @@ func (c *backupCmd) run(ctx context.Context, cfg config.Config, args []string) e
 	if err != nil {
 		return err
 	}
+	pruneBackups(dir, backupKeep())
 	if c.asJSON {
 		return writeJSON(map[string]any{"path": path})
 	}
@@ -89,4 +96,38 @@ func (c *backupCmd) run(ctx context.Context, cfg config.Config, args []string) e
 	fmt.Printf("\nThe snapshot is useless without the key that decrypts the proxy passwords.\n")
 	fmt.Printf("Copy %s off this machine together with it.\n", kekPath(cfg))
 	return nil
+}
+
+func backupKeep() int {
+	if v, ok := os.LookupEnv("DONGLED_BACKUP_KEEP"); ok {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n > 0 {
+			return n
+		}
+	}
+	return config.DefaultBackupKeep
+}
+
+func pruneBackups(dir string, keep int) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		log.Printf("backup: prune skipped, cannot list %s: %v", dir, err)
+		return
+	}
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasPrefix(e.Name(), store.BackupPrefix) || !strings.HasSuffix(e.Name(), store.BackupExt) {
+			continue
+		}
+		names = append(names, e.Name())
+	}
+	if len(names) <= keep {
+		return
+	}
+	sort.Strings(names)
+	for _, name := range names[:len(names)-keep] {
+		p := filepath.Join(dir, name)
+		if err := os.Remove(p); err != nil {
+			log.Printf("backup: prune failed for %s: %v", p, err)
+		}
+	}
 }
