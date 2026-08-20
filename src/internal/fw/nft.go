@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"regexp"
 	"slices"
 	"strconv"
-	"strings"
 	"text/template"
 
 	"github.com/n4darae/huawei-API/src/internal/config"
@@ -398,8 +398,10 @@ func (n *Nft) ResetRules(ctx context.Context) error {
 
 func quote(s string) string { return strconv.Quote(s) }
 
+var validIfaceRe = regexp.MustCompile(`^[A-Za-z0-9._@-]{1,15}$`)
+
 func validIface(s string) error {
-	if strings.TrimSpace(s) == "" {
+	if !validIfaceRe.MatchString(s) || s == "." || s == ".." {
 		return ErrBadIface
 	}
 	return nil
