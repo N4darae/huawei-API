@@ -102,13 +102,13 @@ func familyOf(a netip.Addr) uint8 {
 	return afInet6
 }
 
-func listSockets(family uint8, states uint32) ([]inetDiagEntry, error) {
+func listSockets(ctx context.Context, family uint8, states uint32) ([]inetDiagEntry, error) {
 	c, err := dialNetlink(netlinkInetDiag)
 	if err != nil {
 		return nil, err
 	}
 	defer c.Close()
-	payloads, err := c.dump(sockDiagByFamily, encodeDiagReq(family, protoTCP, states, nil))
+	payloads, err := c.dump(ctx, sockDiagByFamily, encodeDiagReq(family, protoTCP, states, nil))
 	if err != nil {
 		return nil, err
 	}
@@ -121,11 +121,11 @@ func listSockets(family uint8, states uint32) ([]inetDiagEntry, error) {
 	return out, nil
 }
 
-func SocketsFrom(src netip.Addr) ([]inetDiagEntry, error) {
+func socketsFrom(ctx context.Context, src netip.Addr) ([]inetDiagEntry, error) {
 	if !src.IsValid() {
 		return nil, ErrBadAddr
 	}
-	all, err := listSockets(familyOf(src), killableStates())
+	all, err := listSockets(ctx, familyOf(src), killableStates())
 	if err != nil {
 		return nil, err
 	}
@@ -138,11 +138,15 @@ func SocketsFrom(src netip.Addr) ([]inetDiagEntry, error) {
 	return out, nil
 }
 
+func SocketsFrom(src netip.Addr) ([]inetDiagEntry, error) {
+	return socketsFrom(context.Background(), src)
+}
+
 func HasListener(addr netip.Addr, port int) (bool, error) {
 	if !addr.IsValid() {
 		return false, ErrBadAddr
 	}
-	entries, err := listSockets(familyOf(addr), 1<<tcpListen)
+	entries, err := listSockets(context.Background(), familyOf(addr), 1<<tcpListen)
 	if err != nil {
 		return false, err
 	}
@@ -175,7 +179,7 @@ func (n *Nft) KillSockets(ctx context.Context, src netip.Addr) (int, error) {
 	if !src.IsValid() {
 		return 0, ErrBadAddr
 	}
-	targets, err := SocketsFrom(src)
+	targets, err := socketsFrom(ctx, src)
 	if err != nil {
 		return 0, err
 	}
@@ -193,7 +197,7 @@ func (n *Nft) KillSockets(ctx context.Context, src netip.Addr) (int, error) {
 			return killed, ctx.Err()
 		}
 		req := encodeDiagReq(t.Family, protoTCP, 0, t.ID)
-		if err := c.request(sockDestroy, req); err != nil {
+		if err := c.request(ctx, sockDestroy, req); err != nil {
 			continue
 		}
 		killed++
